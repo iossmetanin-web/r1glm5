@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import type { User } from '@/lib/supabase/database.types'
-import { supabase } from '@/lib/supabase/client'
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
@@ -29,35 +28,63 @@ export const useNavigationStore = create<NavigationState>((set) => ({
 interface AuthState {
   currentUser: User | null
   loading: boolean
+  hydrated: boolean
   login: (user: User) => void
   logout: () => void
   setLoading: (l: boolean) => void
+  setHydrated: () => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   currentUser: null,
   loading: true,
+  hydrated: false,
   login: (user) => {
-    if (typeof window !== 'undefined') localStorage.setItem('crm_user_id', user.id)
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('crm_user_id', user.id) } catch { /* ignore */ }
+    }
     set({ currentUser: user })
   },
   logout: () => {
-    if (typeof window !== 'undefined') localStorage.removeItem('crm_user_id')
+    if (typeof window !== 'undefined') {
+      try { localStorage.removeItem('crm_user_id') } catch { /* ignore */ }
+    }
     set({ currentUser: null })
   },
   setLoading: (loading) => set({ loading }),
+  setHydrated: () => set({ hydrated: true }),
 }))
 
-// Restore session from localStorage on load
-if (typeof window !== 'undefined') {
-  const savedId = localStorage.getItem('crm_user_id')
-  if (savedId) {
-    supabase.from('users').select('*').eq('id', savedId).single().then(({ data }) => {
-      if (data) useAuthStore.getState().login(data)
-      useAuthStore.getState().setLoading(false)
-    }).catch(() => useAuthStore.getState().setLoading(false))
-  } else {
+// ─── Session restore (called from client components only via useEffect) ──────
+
+let _restoreStarted = false
+
+export async function restoreSession() {
+  if (_restoreStarted) return
+  _restoreStarted = true
+
+  // Only runs in browser, never during SSR
+  if (typeof window === 'undefined') {
     useAuthStore.getState().setLoading(false)
+    useAuthStore.getState().setHydrated()
+    return
+  }
+
+  try {
+    const savedId = localStorage.getItem('crm_user_id')
+    if (savedId) {
+      // Dynamic import to avoid SSR issues — Supabase client only loaded in browser
+      const { supabase } = await import('@/lib/supabase/client')
+      const { data } = await supabase.from('users').select('*').eq('id', savedId).single()
+      if (data) {
+        useAuthStore.getState().login(data)
+      }
+    }
+  } catch {
+    // Session restore failed — user will see login page
+  } finally {
+    useAuthStore.getState().setLoading(false)
+    useAuthStore.getState().setHydrated()
   }
 }
 
