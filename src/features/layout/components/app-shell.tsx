@@ -6,7 +6,6 @@ import { useAuthStore, useUIStore, restoreSession } from '@/lib/store'
 import { LoginForm } from '@/features/auth/components/login-form'
 import { Sidebar } from './sidebar'
 import { Header } from './header'
-import { MobileNav } from './mobile-nav'
 
 interface AppShellProps {
   children: React.ReactNode
@@ -68,9 +67,6 @@ export function AppShell({ children }: AppShellProps) {
           {children}
         </main>
       </div>
-
-      {/* Bottom navigation: visible ONLY on mobile, ALWAYS present */}
-      <MobileNav />
     </div>
   )
 }

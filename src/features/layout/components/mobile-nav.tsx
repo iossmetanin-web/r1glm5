@@ -38,8 +38,8 @@ export function MobileNav() {
       {/* Safe area spacer */}
       <div className="pb-[env(safe-area-inset-bottom)]">
         {/* Border top with subtle gradient */}
-        <div className="border-t border-border/80 bg-card/95 backdrop-blur-lg">
-          <div className="flex items-center justify-around px-2 py-1">
+        <div className="border-t border-border/80 bg-card">
+          <div className="flex items-center justify-around px-1 py-1.5">
             {mobileNavItems.map((item) => {
               const Icon = item.icon
               const isActive = currentView === item.view
@@ -48,7 +48,7 @@ export function MobileNav() {
                 <button
                   key={item.view}
                   onClick={() => navigate(item.view)}
-                  className="relative flex flex-1 flex-col items-center gap-0.5 py-2"
+                  className="relative flex flex-1 flex-col items-center gap-1 min-h-[44px] justify-center py-2 px-1"
                 >
                   {/* Active pill background */}
                   <div
@@ -61,17 +61,17 @@ export function MobileNav() {
                   {/* Content */}
                   <div className="relative flex flex-col items-center gap-0.5">
                     {/* Colored circle when active */}
-                    <div className={`flex h-7 w-7 items-center justify-center rounded-full transition-all duration-200 ease-in-out ${
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 ease-in-out ${
                       isActive ? `${item.color} shadow-sm scale-105` : ''
                     }`}>
                       <Icon
-                        className={`h-3.5 w-3.5 transition-all duration-200 ease-in-out ${
+                        className={`h-5 w-5 transition-all duration-200 ease-in-out ${
                           isActive ? 'text-white' : item.iconColor
                         }`}
                       />
                     </div>
                     <span
-                      className={`text-[10px] font-medium leading-none transition-all duration-200 ease-in-out ${
+                      className={`text-[11px] font-medium leading-none transition-all duration-200 ease-in-out ${
                         isActive ? item.text : 'text-muted-foreground'
                       }`}
                     >

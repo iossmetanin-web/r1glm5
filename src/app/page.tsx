@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from 'react'
 import { AppShell } from '@/features/layout/components/app-shell'
+import { MobileNav } from '@/features/layout/components/mobile-nav'
 import { useNavigationStore } from '@/lib/store'
 import { DashboardPage } from '@/features/dashboard/components/dashboard-page'
 import DealsPage from '@/features/deals/components/deals-page'
@@ -45,5 +46,10 @@ export default function Home() {
     )
   }
 
-  return <AppContent />
+  return (
+    <>
+      <AppContent />
+      <MobileNav />
+    </>
+  )
 }
