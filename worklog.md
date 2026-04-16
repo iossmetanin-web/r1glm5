@@ -17,3 +17,31 @@ Stage Summary:
 - ISSUE 2: tasks/deals/contacts page root changed from h-full to md:h-full to prevent bottom nav overlap on mobile
 - ISSUE 3: sidebar.tsx hover changed from hover:bg-accent/hover:text-accent-foreground to hover:bg-muted/80/hover:text-foreground
 - User confirmed they couldn't see changes - likely Vercel deployment issue
+
+---
+Task ID: 2
+Agent: main
+Task: Blue CRM design system — comprehensive UI/UX visual overhaul
+
+Work Log:
+- Read all current files: globals.css, mobile-nav.tsx, sidebar.tsx, app-shell.tsx, header.tsx, settings.tsx, login-form.tsx, all page components
+- Updated globals.css with blue design system: primary color changed from black to CRM blue (oklch 0.55 0.22 260), light-only theme, smooth transitions, custom scrollbar, card shadows
+- Updated layout.tsx: defaultTheme="light", enableSystem=false
+- Rewrote mobile-nav.tsx: blue active pill with scale animation, safe-area support, backdrop blur
+- Rewrote sidebar.tsx: blue hover/active states (bg-primary/8, hover:scale-[1.02]), rounded-xl nav items, proper contrast
+- Updated app-shell.tsx: adjusted margins for new sidebar widths, spinner color to primary
+- Rewrote header.tsx: removed theme toggle (light-only), blue hover accents, rounded-lg buttons
+- Rewrote settings.tsx: removed theme/appearance sections entirely, visual polish with primary accent
+- Updated login-form.tsx: blue hover effects on user cards, shadow improvements
+- Used subagents (parallel) to update: dashboard-page.tsx, deals-page.tsx, contacts-page.tsx, tasks-page.tsx
+- All pages now use: rounded-2xl cards, shadow-sm, hover:shadow-md, blue hover states (primary/5, primary/10)
+- Ran lint: 0 errors
+- Started dev server: 200 OK
+- Pushed commit 1e6e30f to origin/main
+
+Stage Summary:
+- Complete blue CRM design system applied across entire application
+- 12 files modified, 296 insertions, 312 deletions
+- Commit: 1e6e30f pushed to origin/main
+- All Russian text preserved unchanged
+- No backend/data/logic changes made
