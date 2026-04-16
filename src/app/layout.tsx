@@ -30,13 +30,21 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="light" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{localStorage.removeItem('theme');localStorage.setItem('theme','light');document.documentElement.classList.remove('dark');document.documentElement.classList.add('light')}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
+          forcedTheme="light"
           enableSystem={false}
           disableTransitionOnChange
         >
