@@ -43,7 +43,7 @@ export function LoginForm() {
             PulseCRM
           </CardTitle>
           <CardDescription className="text-sm text-muted-foreground">
-            Выберите пользователя для входа
+            Select a user to sign in
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-2">

@@ -36,9 +36,9 @@ import { Plus, MoreHorizontal, Trash2, AlertCircle, Package } from 'lucide-react
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const formatCurrency = (v: number) =>
-  new Intl.NumberFormat('en-US', {
+  new Intl.NumberFormat('ru-RU', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'RUB',
     maximumFractionDigits: 0,
   }).format(v || 0)
 
@@ -198,7 +198,7 @@ export default function DealsPage() {
       stage_id: stageId,
       owner_id: currentUser?.id,
       status: 'open',
-      currency: 'USD',
+      currency: 'RUB',
       pipeline_id: stages[0]?.pipeline_id || '',
     })
     if (!error) {
@@ -236,14 +236,14 @@ export default function DealsPage() {
         <div>
           <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
             <Package className="h-5 w-5 text-muted-foreground" />
-            Воронка сделок
+            Deal Pipeline
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             {deals.length} deal{deals.length !== 1 ? 's' : ''} &middot;{' '}
             {formatCurrency(
               deals.reduce((sum: number, d: any) => sum + (d.value || 0), 0)
             )}{' '}
-            общая сумма
+            total
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -265,7 +265,7 @@ export default function DealsPage() {
           </div>
           <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
             <Plus className="h-4 w-4" />
-            Новая сделка
+            New Deal
           </Button>
         </div>
       </div>
@@ -278,7 +278,7 @@ export default function DealsPage() {
           <AlertCircle className="h-10 w-10 text-destructive" />
           <p className="text-sm text-muted-foreground">{error}</p>
           <Button variant="outline" size="sm" onClick={fetchData}>
-            Повторить
+            Retry
           </Button>
         </div>
       )}
@@ -353,7 +353,7 @@ export default function DealsPage() {
                   <div className="space-y-2 pr-2">
                     {stageDeals.length === 0 && (
                       <div className="flex items-center justify-center h-24 text-xs text-muted-foreground rounded-lg border border-dashed">
-                        Пусто
+                        Empty
                       </div>
                     )}
                     {stageDeals.map((deal) => (
@@ -468,7 +468,7 @@ export default function DealsPage() {
 
             {/* Value */}
             <div className="space-y-2">
-              <Label htmlFor="deal-value">Value (USD)</Label>
+              <Label htmlFor="deal-value">Value (RUB)</Label>
               <Input
                 id="deal-value"
                 type="number"
@@ -547,13 +547,13 @@ export default function DealsPage() {
                 variant="outline"
                 onClick={() => setCreateOpen(false)}
               >
-                Отмена
+                Cancel
               </Button>
               <Button
                 onClick={handleCreateDeal}
                 disabled={!newTitle.trim() || creating}
               >
-                {creating ? 'Создание...' : 'Создать сделку'}
+                {creating ? 'Creating...' : 'Create Deal'}
               </Button>
             </div>
           </div>
