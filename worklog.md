@@ -193,3 +193,79 @@ Stage Summary:
 - Auth flow is: Supabase session check → if no session → LoginForm (email/password) → CRM app
 - Zero fallbacks, zero fake users, zero localStorage auth, zero user picker
 - Dev server freshly compiled from clean source — any cached ghost UI is now definitively eliminated
+
+---
+Task ID: 8
+Agent: main
+Task: Analyze Excel files and adapt CRM structure for transformer equipment business
+
+Work Log:
+- Analyzed 6 Excel files uploaded by user:
+  - Алик клиенты (135 rows): перезвоны + Заказы sheets
+  - магел клиенты (133 rows): Лист1 + перезвоны sheets
+  - рам2 (488 rows): 3 sheets including Запросы with prices
+  - Анар клиенты (117 rows): single sheet
+  - рам клиенты (79 rows): перезвоны sheet
+  - срм (1057 rows): Контакты + Работа sheets (ideal CRM template)
+- Identified common structure: Компания+ИНН, Контакты, ЛПР, Комментарии (history), Даты
+- Identified 4 managers: Алик, Магел, Рам, Анар
+- Identified business: transformer equipment sales (КТП, ТМГ, ТСЛ, БКТП, ТРДНС)
+- Asked 8 initial clarification questions + 9 expert questions
+- Received complete requirements from user
+
+Stage Summary:
+- Full requirements gathered for CRM adaptation
+- Key features: companies with INN/city/source/status, multiple LPR contacts, activity timeline, KP management, task queues, overdue escalation (3 days), conversion analytics
+- Statuses: слабый интерес → надо залечивать → сделал запрос → сделал заказ
+- Sources: входящая заявка / реклама / холодный обзвон / личный контакт
+- All 4 managers equal rights, see own clients + overdue (3+ days) from others
+- RLS policies: manager sees own + overdue + заказ status
+
+---
+Task ID: 9
+Agent: main + subagents
+Task: Implement CRM structure adaptation — Phase 1
+
+Work Log:
+- Created SQL migration: `supabase/migrations/001_crm_transformer_schema.sql`
+  - New tables: companies, company_contacts, proposals, proposal_items, activities (enhanced)
+  - ALTER tasks: added company_id, is_recurring, recurrence_days, is_shared
+  - RLS policies for all new tables with manager + overdue + order visibility rules
+  - Indexes for INN, manager, status, next_contact_date
+  - updated_at triggers, pipeline stages seed data
+- Updated `src/lib/supabase/database.types.ts`:
+  - Added Company, CompanyContact, Proposal, ProposalItem types
+  - Added constants: COMPANY_SOURCES, COMPANY_STATUSES, ACTIVITY_TYPES, PROPOSAL_STATUSES, LOST_REASONS
+  - Enhanced Task type with company_id, is_recurring, recurrence_days, is_shared
+  - Extended relation types: CompanyWithManager, CompanyWithRelations, ActivityWithUser, ProposalWithItems
+- Updated `src/lib/store.ts`:
+  - Added 'companies' and 'company-detail' to AppView type
+  - Added selectedCompanyId to NavigationState
+  - Added openCompany() navigation action
+- Updated navigation:
+  - sidebar.tsx: contacts → companies (label: "Клиенты")
+  - mobile-nav.tsx: contacts → companies (label: "Клиенты")
+- Updated `src/app/page.tsx`: added CompaniesPage, CompanyDetailPage to views map
+- Created `src/features/companies/components/companies-page.tsx` (1145 lines, subagent):
+  - Company list with search, status/source/manager filters
+  - Overdue banner (red alert for 3+ days overdue)
+  - Desktop table + mobile cards with status badges (color-coded)
+  - Create/Edit dialog with 10 fields + INN duplicate check
+  - Activity logging on create/update
+- Created `src/features/companies/components/company-detail-page.tsx` (1649 lines, subagent):
+  - Company header card with all info + edit/delete
+  - 4 tabs: Контакты ЛПР, История (timeline), КП, Задачи
+  - LPR management: add/edit/delete contacts with is_primary
+  - Activity timeline: type icons, content, user, dates
+  - Quick note input at bottom of timeline
+  - KP management: proposals with dynamic item list, auto-calculated totals
+  - Linked tasks list with add capability
+  - Auto activity on status change, auto next_contact_date update
+- Ran lint: 0 errors
+
+Stage Summary:
+- Phase 1 complete: Database schema + types + Companies list + Company detail page
+- SQL migration ready to run in Supabase SQL Editor
+- 8 files modified/created, ~2800 lines of new CRM-specific code
+- All Russian text, mobile-responsive, shadcn/ui components
+- Pending: Dashboard upgrade (funnel, conversion, overdue analytics)

@@ -3,13 +3,15 @@ import type { User } from '@/lib/supabase/database.types'
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
-export type AppView = 'dashboard' | 'deals' | 'deal-detail' | 'contacts' | 'tasks' | 'settings'
+export type AppView = 'dashboard' | 'companies' | 'company-detail' | 'deals' | 'deal-detail' | 'tasks' | 'settings'
 
 interface NavigationState {
   currentView: AppView
   selectedDealId: string | null
+  selectedCompanyId: string | null
   navigate: (view: AppView) => void
   openDeal: (dealId: string) => void
+  openCompany: (companyId: string) => void
   goBack: () => void
   previousView: AppView | null
 }
@@ -17,10 +19,12 @@ interface NavigationState {
 export const useNavigationStore = create<NavigationState>((set) => ({
   currentView: 'dashboard',
   selectedDealId: null,
+  selectedCompanyId: null,
   previousView: null,
-  navigate: (view) => set((s) => ({ currentView: view, selectedDealId: null, previousView: s.currentView })),
+  navigate: (view) => set((s) => ({ currentView: view, selectedDealId: null, selectedCompanyId: null, previousView: s.currentView })),
   openDeal: (dealId) => set((s) => ({ currentView: 'deal-detail', selectedDealId: dealId, previousView: s.currentView })),
-  goBack: () => set((s) => ({ currentView: s.previousView || 'dashboard', selectedDealId: null })),
+  openCompany: (companyId) => set((s) => ({ currentView: 'company-detail', selectedCompanyId: companyId, previousView: s.currentView })),
+  goBack: () => set((s) => ({ currentView: s.previousView || 'dashboard', selectedDealId: null, selectedCompanyId: null })),
 }))
 
 // ─── Auth (Supabase Auth only — NO fake users, NO localStorage hacks) ─────
