@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import type { Task, TaskInsert, TaskUpdate } from '@/lib/supabase/database.types'
-import { useAuthStore } from '@/lib/store'
+import type { TaskWithRelations, Company } from '@/lib/supabase/database.types'
+import { useAuthStore, useNavigationStore } from '@/lib/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -40,31 +42,53 @@ import {
   CheckSquare,
   AlertCircle,
   Calendar,
+  RefreshCw,
+  Users,
+  Building2,
+  ArrowRight,
+  Clock,
 } from 'lucide-react'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 type TaskStatus = 'todo' | 'in_progress' | 'done'
 type TaskPriority = 'low' | 'medium' | 'high'
-type FilterTab = 'all' | TaskStatus
+type FilterTab = 'all' | 'today' | 'overdue' | 'done'
 
 interface TaskFormData {
   title: string
   description: string
   priority: TaskPriority
   deadline: string
+  company_id: string
+  status: TaskStatus
+  is_recurring: boolean
+  recurrence_days: number
+  is_shared: boolean
 }
 
-const STATUS_TABS: { value: FilterTab; label: string }[] = [
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const FILTER_TABS: { value: FilterTab; label: string }[] = [
   { value: 'all', label: 'Все' },
-  { value: 'todo', label: 'К выполнению' },
-  { value: 'in_progress', label: 'В работе' },
-  { value: 'done', label: 'Выполнено' },
+  { value: 'today', label: 'На сегодня' },
+  { value: 'overdue', label: 'Просроченные' },
+  { value: 'done', label: 'Выполненные' },
 ]
 
-const PRIORITY_OPTIONS: TaskPriority[] = ['low', 'medium', 'high']
+const PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: 'Низкий',
+  medium: 'Средний',
+  high: 'Высокий',
+}
 
-const PRIORITY_BADGE: Record<TaskPriority, string> = {
+const STATUS_LABELS: Record<TaskStatus, string> = {
+  todo: 'К выполнению',
+  in_progress: 'В работе',
+  done: 'Выполнено',
+}
+
+const PRIORITY_BADGE_CLASSES: Record<TaskPriority, string> = {
   low: 'bg-muted text-muted-foreground',
   medium: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
   high: 'bg-red-500/10 text-red-600 dark:text-red-400',
@@ -75,57 +99,91 @@ const EMPTY_FORM: TaskFormData = {
   description: '',
   priority: 'medium',
   deadline: '',
+  company_id: '',
+  status: 'todo',
+  is_recurring: false,
+  recurrence_days: 1,
+  is_shared: false,
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Date Helpers ─────────────────────────────────────────────────────────────
 
-function formatDeadline(dateStr: string | null): string {
-  if (!dateStr) return ''
+function getTodayStr(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+function isToday(dateStr: string): boolean {
+  return dateStr === getTodayStr()
+}
+
+function isOverdue(deadline: string | null, status: string): boolean {
+  if (!deadline || status === 'done') return false
+  return deadline < getTodayStr()
+}
+
+function getDeadlineLabel(dateStr: string, status: string): {
+  display: string
+  isOverdueFlag: boolean
+} {
   const date = new Date(dateStr + 'T00:00:00')
   const now = new Date()
   now.setHours(0, 0, 0, 0)
   const diffDays = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
   const formatted = date.toLocaleDateString('ru-RU', {
-    month: 'short',
     day: 'numeric',
+    month: 'short',
+    year: 'numeric',
   })
 
-  if (diffDays < 0) return `${formatted} (просрочено)`
-  if (diffDays === 0) return `${formatted} (сегодня)`
-  if (diffDays === 1) return `${formatted} (завтра)`
-  return formatted
+  if (status === 'done') {
+    return { display: formatted, isOverdueFlag: false }
+  }
+
+  if (diffDays < 0) {
+    return { display: 'просрочено', isOverdueFlag: true }
+  }
+  if (diffDays === 0) {
+    return { display: 'сегодня', isOverdueFlag: false }
+  }
+  if (diffDays === 1) {
+    return { display: 'завтра', isOverdueFlag: false }
+  }
+  return { display: formatted, isOverdueFlag: false }
 }
 
-function formatDate(dateStr: string): string {
+function formatCreatedDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('ru-RU', {
-    month: 'short',
     day: 'numeric',
+    month: 'short',
     year: 'numeric',
   })
 }
 
-function isOverdue(deadline: string | null, status: string): boolean {
-  if (!deadline || status === 'done') return false
-  const date = new Date(deadline + 'T23:59:59')
-  return date < new Date()
+function addDays(dateStr: string, days: number): string {
+  const date = new Date(dateStr + 'T00:00:00')
+  date.setDate(date.getDate() + days)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function TasksPage() {
   const currentUser = useAuthStore((s) => s.currentUser)
+  const openCompany = useNavigationStore((s) => s.openCompany)
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
-  const [tasks, setTasks] = useState<Task[]>([])
+  const [tasks, setTasks] = useState<TaskWithRelations[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [editingTask, setEditingTask] = useState<TaskWithRelations | null>(null)
   const [form, setForm] = useState<TaskFormData>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
 
@@ -134,141 +192,248 @@ export default function TasksPage() {
 
   // ─── Data Fetching ────────────────────────────────────────────────────────
 
+  const fetchTasks = useCallback(async () => {
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('tasks')
+        .select('*, company:companies(id, name), created_by_user:users!created_by(id, name)')
+        .order('created_at', { ascending: false })
+
+      if (fetchError) {
+        setError(fetchError.message)
+      } else {
+        setTasks((data ?? []) as TaskWithRelations[])
+        setError(null)
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Не удалось загрузить задачи'
+      setError(message)
+    }
+  }, [])
+
+  const fetchCompanies = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from('companies')
+        .select('id, name')
+        .order('name')
+      if (data) setCompanies(data)
+    } catch {
+      // non-critical
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
+
     async function load() {
-      try {
-        const { data, error: fetchError } = await supabase
-          .from('tasks')
-          .select('*')
-          .order('created_at', { ascending: false })
-
-        if (cancelled) return
-
-        if (fetchError) {
-          setError(fetchError.message)
-        } else {
-          setTasks(data ?? [])
-          setError(null)
-        }
-      } catch (err: unknown) {
-        if (cancelled) return
-        const message = err instanceof Error ? err.message : 'Не удалось загрузить задачи'
-        setError(message)
-      }
-      setLoading(false)
+      await Promise.all([fetchTasks(), fetchCompanies()])
+      if (!cancelled) setLoading(false)
     }
     load()
-    return () => {
-      cancelled = true
-    }
-  }, [fetchTrigger])
+    return () => { cancelled = true }
+  }, [fetchTrigger, fetchTasks, fetchCompanies])
 
   const refresh = () => {
     setLoading(true)
     setFetchTrigger((n) => n + 1)
   }
 
+  // ─── Computed Counts ──────────────────────────────────────────────────────
+
+  const { totalCount, overdueCount, tabCounts } = useMemo(() => {
+    let overdue = 0
+    const counts: Record<FilterTab, number> = { all: 0, today: 0, overdue: 0, done: 0 }
+
+    for (const t of tasks) {
+      counts.all++
+
+      if (t.status === 'done') {
+        counts.done++
+        continue
+      }
+
+      const taskOverdue = isOverdue(t.deadline, t.status)
+      if (taskOverdue) overdue++
+
+      if (taskOverdue) {
+        counts.overdue++
+      }
+
+      if (t.deadline && isToday(t.deadline)) {
+        counts.today++
+      }
+
+      // "На сегодня" also includes overdue tasks
+      if (taskOverdue) {
+        counts.today++
+      }
+    }
+
+    return { totalCount: counts.all, overdueCount: overdue, tabCounts: counts }
+  }, [tasks])
+
   // ─── Filtered Tasks ───────────────────────────────────────────────────────
 
   const filteredTasks = useMemo(() => {
-    if (activeTab === 'all') return tasks
-    return tasks.filter((t) => t.status === activeTab)
+    const todayStr = getTodayStr()
+
+    switch (activeTab) {
+      case 'today':
+        return tasks.filter((t) => {
+          if (t.status === 'done') return false
+          // Today's tasks
+          if (t.deadline && t.deadline === todayStr) return true
+          // Shared tasks from other managers due today
+          if (t.is_shared && t.deadline && t.deadline === todayStr) return true
+          // Overdue tasks
+          if (t.deadline && t.deadline < todayStr) return true
+          // Shared overdue tasks
+          if (t.is_shared && t.deadline && t.deadline < todayStr) return true
+          return false
+        })
+      case 'overdue':
+        return tasks.filter((t) => isOverdue(t.deadline, t.status))
+      case 'done':
+        return tasks.filter((t) => t.status === 'done')
+      default:
+        return tasks
+    }
   }, [tasks, activeTab])
 
-  // ─── Status Counts ────────────────────────────────────────────────────────
+  // ─── Recurring Task Logic ─────────────────────────────────────────────────
 
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: tasks.length, todo: 0, in_progress: 0, done: 0 }
-    for (const t of tasks) {
-      if (t.status in counts) counts[t.status]++
-    }
-    return counts
-  }, [tasks])
+  const toggleDone = async (task: TaskWithRelations) => {
+    const wasDone = task.status === 'done'
+    const newStatus: TaskStatus = wasDone ? 'in_progress' : 'done'
 
-  // ─── Toggle Done ──────────────────────────────────────────────────────────
-
-  const toggleDone = async (task: Task) => {
-    const newStatus: TaskStatus = task.status === 'done' ? 'todo' : 'done'
     const { error: updateError } = await supabase
       .from('tasks')
       .update({ status: newStatus })
       .eq('id', task.id)
 
-    if (!updateError) {
+    if (updateError) return
+
+    // Log activity
+    await supabase.from('activities').insert({
+      content: newStatus === 'done'
+        ? `Выполнена задача «${task.title}»`
+        : `Задача «${task.title}» возвращена в работу`,
+      type: 'заметка',
+      user_id: currentUser?.id,
+    })
+
+    // Recurring: when marking done, create next occurrence
+    if (newStatus === 'done' && task.is_recurring && task.recurrence_days && task.deadline) {
+      const newDeadline = addDays(task.deadline, task.recurrence_days)
+
+      // Set last_recurrence on completed task
+      await supabase
+        .from('tasks')
+        .update({ last_recurrence: task.deadline })
+        .eq('id', task.id)
+
+      // Create next task
+      await supabase.from('tasks').insert({
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        status: 'todo',
+        deadline: newDeadline,
+        company_id: task.company_id,
+        client_id: task.client_id,
+        project_id: task.project_id,
+        created_by: currentUser?.id,
+        is_recurring: true,
+        recurrence_days: task.recurrence_days,
+        is_shared: task.is_shared ?? false,
+      })
+
       await supabase.from('activities').insert({
-        action: newStatus === 'done'
-          ? `Выполнена задача «${task.title}»`
-          : `Задача «${task.title}» возвращена в работу`,
-        entity_type: 'task',
-        entity_id: task.id,
+        content: `Создана повторяющаяся задача «${task.title}» на ${newDeadline}`,
+        type: 'заметка',
         user_id: currentUser?.id,
       })
-      refresh()
     }
+
+    refresh()
   }
 
   // ─── Create / Update ──────────────────────────────────────────────────────
 
   const openCreateDialog = () => {
     setEditingTask(null)
-    setForm(EMPTY_FORM)
+    setForm({
+      ...EMPTY_FORM,
+      deadline: getTodayStr(),
+    })
     setDialogOpen(true)
   }
 
-  const openEditDialog = (task: Task) => {
+  const openEditDialog = (task: TaskWithRelations) => {
     setEditingTask(task)
     setForm({
       title: task.title,
       description: task.description ?? '',
       priority: (task.priority as TaskPriority) || 'medium',
       deadline: task.deadline ?? '',
+      company_id: task.company_id ?? '',
+      status: (task.status as TaskStatus) || 'todo',
+      is_recurring: task.is_recurring ?? false,
+      recurrence_days: task.recurrence_days ?? 1,
+      is_shared: task.is_shared ?? false,
     })
     setDialogOpen(true)
   }
 
   const handleSave = async () => {
-    if (!form.title.trim()) return
+    if (!form.title.trim() || !form.deadline) return
     setSaving(true)
 
     try {
       if (editingTask) {
-        const updates: TaskUpdate = {
-          title: form.title.trim(),
-          description: form.description.trim() || null,
-          priority: form.priority,
-          deadline: form.deadline || null,
-        }
         const { error: updateError } = await supabase
           .from('tasks')
-          .update(updates)
+          .update({
+            title: form.title.trim(),
+            description: form.description.trim() || null,
+            priority: form.priority,
+            deadline: form.deadline || null,
+            company_id: form.company_id || null,
+            status: form.status,
+            is_recurring: form.is_recurring || null,
+            recurrence_days: form.is_recurring ? form.recurrence_days : null,
+            is_shared: form.is_shared || null,
+          })
           .eq('id', editingTask.id)
 
         if (!updateError) {
           await supabase.from('activities').insert({
-            action: `Обновлена задача «${form.title.trim()}»`,
-            entity_type: 'task',
-            entity_id: editingTask.id,
+            content: `Обновлена задача «${form.title.trim()}»`,
+            type: 'заметка',
             user_id: currentUser?.id,
           })
         }
       } else {
-        const insert: TaskInsert = {
-          title: form.title.trim(),
-          description: form.description.trim() || null,
-          status: 'todo',
-          priority: form.priority,
-          deadline: form.deadline || null,
-          created_by: currentUser?.id,
-        }
         const { error: insertError } = await supabase
           .from('tasks')
-          .insert(insert)
+          .insert({
+            title: form.title.trim(),
+            description: form.description.trim() || null,
+            status: 'todo',
+            priority: form.priority,
+            deadline: form.deadline || null,
+            company_id: form.company_id || null,
+            created_by: currentUser?.id,
+            is_recurring: form.is_recurring || null,
+            recurrence_days: form.is_recurring ? form.recurrence_days : null,
+            is_shared: form.is_shared || null,
+          })
 
         if (!insertError) {
           await supabase.from('activities').insert({
-            action: `Создана задача «${form.title.trim()}»`,
-            entity_type: 'task',
+            content: `Создана задача «${form.title.trim()}»`,
+            type: 'заметка',
             user_id: currentUser?.id,
           })
         }
@@ -284,10 +449,30 @@ export default function TasksPage() {
     setSaving(false)
   }
 
+  // ─── Mark as In Progress ──────────────────────────────────────────────────
+
+  const markInProgress = async (task: TaskWithRelations) => {
+    if (task.status === 'in_progress') return
+
+    const { error } = await supabase
+      .from('tasks')
+      .update({ status: 'in_progress' })
+      .eq('id', task.id)
+
+    if (!error) {
+      await supabase.from('activities').insert({
+        content: `Задача «${task.title}» взята в работу`,
+        type: 'заметка',
+        user_id: currentUser?.id,
+      })
+      refresh()
+    }
+  }
+
   // ─── Delete ───────────────────────────────────────────────────────────────
 
-  const handleDelete = async (task: Task) => {
-    if (!window.confirm(`Удалить "${task.title}"? Это действие нельзя отменить.`)) return
+  const handleDelete = async (task: TaskWithRelations) => {
+    if (!window.confirm(`Удалить «${task.title}»? Это действие нельзя отменить.`)) return
 
     const { error: deleteError } = await supabase
       .from('tasks')
@@ -296,14 +481,18 @@ export default function TasksPage() {
 
     if (!deleteError) {
       await supabase.from('activities').insert({
-        action: `Удалена задача «${task.title}»`,
-        entity_type: 'task',
-        entity_id: task.id,
+        content: `Удалена задача «${task.title}»`,
+        type: 'заметка',
         user_id: currentUser?.id,
       })
       refresh()
     }
   }
+
+  // ─── Form Helpers ─────────────────────────────────────────────────────────
+
+  const updateForm = (patch: Partial<TaskFormData>) =>
+    setForm((prev) => ({ ...prev, ...patch }))
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -317,13 +506,18 @@ export default function TasksPage() {
             Задачи
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {tasks.length} задач всего
+            {totalCount} задач
+            {overdueCount > 0 && (
+              <span className="text-red-500 dark:text-red-400 ml-1">
+                · {overdueCount} просрочено
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Status Tabs */}
+          {/* Filter Tabs */}
           <div className="flex items-center gap-1 bg-muted/60 rounded-xl p-1">
-            {STATUS_TABS.map((tab) => (
+            {FILTER_TABS.map((tab) => (
               <button
                 key={tab.value}
                 onClick={() => setActiveTab(tab.value)}
@@ -335,14 +529,14 @@ export default function TasksPage() {
               >
                 {tab.label}
                 <span className="ml-1.5 opacity-60">
-                  ({statusCounts[tab.value]})
+                  ({tabCounts[tab.value]})
                 </span>
               </button>
             ))}
           </div>
           <Button size="sm" onClick={openCreateDialog} className="gap-1.5 rounded-xl">
             <Plus className="h-4 w-4" />
-            Добавить задачу
+            Новая задача
           </Button>
         </div>
       </div>
@@ -364,24 +558,28 @@ export default function TasksPage() {
       {loading && (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <Card key={i} className="rounded-xl shadow-sm border border-border/60 transition-all duration-200 hover:shadow-md">
+            <Card key={i} className="rounded-xl shadow-sm border border-border/60">
               <CardContent className="p-4 flex items-start gap-3">
                 <Skeleton className="h-5 w-5 rounded-[4px] mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
                   <Skeleton className="h-3 w-1/2" />
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-5 w-14 rounded-full" />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Skeleton className="h-5 w-14 rounded-full" />
-                  <Skeleton className="h-8 w-8 rounded-md" />
-                </div>
+                <Skeleton className="h-8 w-8 rounded-md shrink-0" />
               </CardContent>
             </Card>
           ))}
         </div>
       )}
 
-      {/* ── Empty State ────────────────────────────────────────────────────── */}
+      {/* ── Empty State (no tasks at all) ─────────────────────────────────── */}
       {!loading && !error && tasks.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
@@ -390,12 +588,12 @@ export default function TasksPage() {
           <div className="text-center">
             <p className="text-base font-medium text-foreground">Нет задач</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Создайте первую задачу
+              Создайте первую задачу для начала работы
             </p>
           </div>
           <Button size="sm" onClick={openCreateDialog} className="gap-1.5 rounded-xl">
             <Plus className="h-4 w-4" />
-            Добавить задачу
+            Новая задача
           </Button>
         </div>
       )}
@@ -412,113 +610,193 @@ export default function TasksPage() {
             size="sm"
             onClick={() => setActiveTab('all')}
           >
-            Показать все
+            Сбросить фильтр
           </Button>
         </div>
       )}
 
       {/* ── Task List ──────────────────────────────────────────────────────── */}
       {!loading && !error && filteredTasks.length > 0 && (
-        <div className="space-y-3 flex-1 overflow-y-auto max-h-[calc(100vh-260px)] pr-1">
-          {filteredTasks.map((task) => {
-            const isDone = task.status === 'done'
-            const priority = (task.priority as TaskPriority) || 'medium'
-            const overdue = isOverdue(task.deadline, task.status)
+        <ScrollArea className="flex-1 max-h-[calc(100vh-240px)]">
+          <div className="space-y-3 pr-1">
+            {filteredTasks.map((task) => {
+              const isDone = task.status === 'done'
+              const priority = (task.priority as TaskPriority) || 'medium'
+              const overdue = isOverdue(task.deadline, task.status)
+              const deadlineInfo = task.deadline
+                ? getDeadlineLabel(task.deadline, task.status)
+                : null
 
-            return (
-              <Card
-                key={task.id}
-                className="rounded-xl border border-border/60 shadow-sm transition-all duration-200 hover:shadow-md hover:bg-primary/5"
-              >
-                <CardContent className="p-4 flex items-start gap-3">
-                  {/* Checkbox */}
-                  <div className="mt-0.5 shrink-0">
-                    <Checkbox
-                      checked={isDone}
-                      onCheckedChange={() => toggleDone(task)}
-                      className="h-5 w-5 rounded-[4px]"
-                      aria-label={`${isDone ? 'Отменить выполнение' : 'Выполнить'}: ${task.title}`}
-                    />
-                  </div>
+              return (
+                <Card
+                  key={task.id}
+                  className={`rounded-xl border shadow-sm transition-all duration-200 hover:shadow-md hover:bg-primary/[0.02] ${
+                    overdue
+                      ? 'border-l-4 border-l-red-500 border-t-border border-r-border border-b-border'
+                      : 'border-border/60'
+                  }`}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      {/* Checkbox */}
+                      <div className="mt-0.5 shrink-0">
+                        <Checkbox
+                          checked={isDone}
+                          onCheckedChange={() => toggleDone(task)}
+                          className="h-5 w-5 rounded-[4px]"
+                          aria-label={
+                            isDone
+                              ? `Отменить выполнение: ${task.title}`
+                              : `Выполнить: ${task.title}`
+                          }
+                        />
+                      </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p
-                        className={`text-sm font-medium leading-snug ${
-                          isDone
-                            ? 'line-through text-muted-foreground'
-                            : 'text-foreground'
-                        }`}
-                      >
-                        {task.title}
-                      </p>
-
-                      {/* Right side: priority + deadline + actions */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] font-medium border-transparent ${PRIORITY_BADGE[priority]}`}
-                        >
-                          {priority}
-                        </Badge>
-                        {task.deadline && (
-                          <span
-                            className={`text-[11px] flex items-center gap-1 whitespace-nowrap ${
-                              overdue
-                                ? 'text-red-500 dark:text-red-400'
-                                : 'text-muted-foreground'
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        {/* Title Row */}
+                        <div className="flex items-start justify-between gap-2">
+                          <p
+                            className={`text-sm font-medium leading-snug ${
+                              isDone
+                                ? 'line-through text-muted-foreground'
+                                : 'text-foreground'
                             }`}
                           >
-                            <Calendar className="h-3 w-3" />
-                            {formatDeadline(task.deadline)}
-                          </span>
+                            {task.title}
+                          </p>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {/* Overdue Badge */}
+                            {overdue && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] font-medium border-red-300 bg-red-500/10 text-red-600 dark:text-red-400 dark:border-red-800"
+                              >
+                                Просрочено
+                              </Badge>
+                            )}
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-colors"
+                                  aria-label="Действия с задачей"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEditDialog(task)}>
+                                  <Pencil className="h-3.5 w-3.5 mr-2" />
+                                  Изменить
+                                </DropdownMenuItem>
+                                {task.status !== 'in_progress' && task.status !== 'done' && (
+                                  <DropdownMenuItem onClick={() => markInProgress(task)}>
+                                    <ArrowRight className="h-3.5 w-3.5 mr-2" />
+                                    Взять в работу
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => handleDelete(task)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                  Удалить
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+
+                        {/* Description */}
+                        {task.description && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {task.description}
+                          </p>
                         )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-colors"
-                              aria-label="Действия с задачей"
+
+                        {/* Meta Row: priority, deadline, badges, created date */}
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          {/* Priority Badge */}
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] font-medium border-transparent ${PRIORITY_BADGE_CLASSES[priority]}`}
+                          >
+                            {PRIORITY_LABELS[priority]}
+                          </Badge>
+
+                          {/* Deadline */}
+                          {deadlineInfo && (
+                            <span
+                              className={`text-[11px] flex items-center gap-1 ${
+                                deadlineInfo.isOverdueFlag
+                                  ? 'text-red-500 dark:text-red-400'
+                                  : 'text-muted-foreground'
+                              }`}
                             >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEditDialog(task)}>
-                              <Pencil className="h-3.5 w-3.5 mr-2" />
-                              Изменить
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => handleDelete(task)}
+                              <Calendar className="h-3 w-3" />
+                              {deadlineInfo.display}
+                            </span>
+                          )}
+
+                          {/* Company Badge */}
+                          {task.company && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] font-medium gap-1 cursor-pointer hover:bg-primary/10 transition-colors"
+                              onClick={() => openCompany(task.company!.id)}
                             >
-                              <Trash2 className="h-3.5 w-3.5 mr-2" />
-                              Удалить
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              <Building2 className="h-3 w-3" />
+                              {task.company.name}
+                            </Badge>
+                          )}
+
+                          {/* Recurring Badge */}
+                          {task.is_recurring && task.recurrence_days && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] font-medium gap-1 border-emerald-300 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 dark:border-emerald-800"
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              каждые {task.recurrence_days} дн.
+                            </Badge>
+                          )}
+
+                          {/* Shared Badge */}
+                          {task.is_shared && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] font-medium gap-1 border-blue-300 bg-blue-500/10 text-blue-600 dark:text-blue-400 dark:border-blue-800"
+                            >
+                              <Users className="h-3 w-3" />
+                              Общая
+                            </Badge>
+                          )}
+
+                          {/* Created Date */}
+                          <span className="text-[11px] text-muted-foreground flex items-center gap-1 ml-auto">
+                            <Clock className="h-3 w-3" />
+                            {formatCreatedDate(task.created_at)}
+                          </span>
+                        </div>
+
+                        {/* Created by (if shared and not current user) */}
+                        {task.is_shared && task.created_by_user && task.created_by_user.id !== currentUser?.id && (
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Создана: {task.created_by_user.name}
+                          </p>
+                        )}
                       </div>
                     </div>
-
-                    {/* Description */}
-                    {task.description && (
-                      <p className="text-xs text-muted-foreground mt-1 truncate max-w-[600px]">
-                        {task.description}
-                      </p>
-                    )}
-
-                    {/* Bottom meta row */}
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-[11px] text-muted-foreground">
-                        Создано {formatDate(task.created_at)}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </ScrollArea>
       )}
 
       {/* ── Create / Edit Dialog ───────────────────────────────────────────── */}
@@ -532,7 +810,7 @@ export default function TasksPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {editingTask ? (
@@ -558,7 +836,7 @@ export default function TasksPage() {
                 id="task-title"
                 placeholder="напр. Связаться с клиентом"
                 value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                onChange={(e) => updateForm({ title: e.target.value })}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
@@ -575,9 +853,7 @@ export default function TasksPage() {
                 id="task-description"
                 placeholder="Добавьте описание задачи (необязательно)"
                 value={form.description}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, description: e.target.value }))
-                }
+                onChange={(e) => updateForm({ description: e.target.value })}
                 rows={3}
                 className="resize-none"
               />
@@ -589,34 +865,132 @@ export default function TasksPage() {
                 <Label>Приоритет</Label>
                 <Select
                   value={form.priority}
-                  onValueChange={(v) =>
-                    setForm((f) => ({ ...f, priority: v as TaskPriority }))
-                  }
+                  onValueChange={(v) => updateForm({ priority: v as TaskPriority })}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Выберите приоритет" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PRIORITY_OPTIONS.map((p) => (
-                      <SelectItem key={p} value={p} className="capitalize">
-                        {p}
+                    {(['low', 'medium', 'high'] as TaskPriority[]).map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {PRIORITY_LABELS[p]}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="task-deadline">Срок</Label>
+                <Label htmlFor="task-deadline">
+                  Срок <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="task-deadline"
                   type="date"
                   value={form.deadline}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, deadline: e.target.value }))
-                  }
+                  onChange={(e) => updateForm({ deadline: e.target.value })}
+                  className={form.deadline ? '' : 'border-destructive/50 focus-visible:ring-destructive/30'}
                 />
+                {!form.deadline && (
+                  <p className="text-[11px] text-destructive">Укажите срок выполнения</p>
+                )}
               </div>
             </div>
+
+            {/* Company */}
+            <div className="space-y-2">
+              <Label>Компания</Label>
+              <Select
+                value={form.company_id}
+                onValueChange={(v) => updateForm({ company_id: v })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Выберите компанию (необязательно)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Recurring */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="task-recurring"
+                  checked={form.is_recurring}
+                  onCheckedChange={(checked) =>
+                    updateForm({ is_recurring: !!checked })
+                  }
+                />
+                <Label htmlFor="task-recurring" className="cursor-pointer">
+                  Повторяющаяся задача
+                </Label>
+              </div>
+              {form.is_recurring && (
+                <div className="flex items-center gap-2 pl-6">
+                  <Label className="text-sm text-muted-foreground whitespace-nowrap">
+                    каждые
+                  </Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={form.recurrence_days}
+                    onChange={(e) =>
+                      updateForm({
+                        recurrence_days: Math.max(1, parseInt(e.target.value) || 1),
+                      })
+                    }
+                    className="w-20"
+                  />
+                  <Label className="text-sm text-muted-foreground whitespace-nowrap">
+                    дн.
+                  </Label>
+                </div>
+              )}
+            </div>
+
+            {/* Shared */}
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="task-shared"
+                checked={form.is_shared}
+                onCheckedChange={(checked) =>
+                  updateForm({ is_shared: !!checked })
+                }
+              />
+              <Label htmlFor="task-shared" className="cursor-pointer">
+                Видна всем менеджерам
+              </Label>
+            </div>
+
+            {/* Status (only in edit mode) */}
+            {editingTask && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label>Статус</Label>
+                  <Select
+                    value={form.status}
+                    onValueChange={(v) => updateForm({ status: v as TaskStatus })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(['todo', 'in_progress', 'done'] as TaskStatus[]).map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {STATUS_LABELS[s]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
 
             {/* Actions */}
             <div className="flex justify-end gap-2 pt-2">
@@ -632,7 +1006,7 @@ export default function TasksPage() {
               </Button>
               <Button
                 onClick={handleSave}
-                disabled={!form.title.trim() || saving}
+                disabled={!form.title.trim() || !form.deadline || saving}
                 className="rounded-xl"
               >
                 {saving

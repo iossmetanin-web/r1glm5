@@ -15,35 +15,78 @@ import {
   Legend,
 } from 'recharts'
 import {
+  Building2,
   TrendingUp,
-  DollarSign,
-  Trophy,
-  Target,
-  Package,
-  Clock,
-  MessageSquare,
-  UserPlus,
-  FileEdit,
+  AlertTriangle,
+  CheckSquare,
+  Phone,
+  Mail,
+  MessageCircle,
+  User,
+  FileText,
+  StickyNote,
   CheckCircle2,
   AlertCircle,
+  RefreshCw,
+  Users,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Checkbox } from '@/components/ui/checkbox'
 import { supabase } from '@/lib/supabase/client'
-import { useNavigationStore } from '@/lib/store'
 import type {
-  Deal,
-  PipelineStage,
+  Company,
   Activity,
-  DealWithStage,
+  Task,
+  Proposal,
+  User as UserType,
 } from '@/lib/supabase/database.types'
 
 // ── Local types for Supabase join responses ──────────────────────────────────
 
 interface ActivityWithUser extends Activity {
-  users: { name: string }[]
+  user: Pick<UserType, 'id' | 'name'> | null
+}
+
+interface TaskWithCompany extends Task {
+  company: Pick<Company, 'id' | 'name'> | null
+}
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const STATUS_COLORS: Record<string, string> = {
+  'слабый интерес': '#94a3b8',
+  'надо залечивать': '#f59e0b',
+  'сделал запрос': '#0ea5e9',
+  'сделал заказ': '#22c55e',
+}
+
+const STATUS_ORDER = [
+  'слабый интерес',
+  'надо залечивать',
+  'сделал запрос',
+  'сделал заказ',
+]
+
+const SOURCE_COLORS: Record<string, string> = {
+  'входящая заявка': '#0ea5e9',
+  'реклама': '#f59e0b',
+  'холодный обзвон': '#94a3b8',
+  'личный контакт': '#22c55e',
+}
+
+const PRIORITY_LABELS: Record<string, string> = {
+  low: 'Низкий',
+  medium: 'Средний',
+  high: 'Высокий',
+}
+
+const PRIORITY_VARIANTS: Record<string, 'secondary' | 'outline' | 'destructive'> = {
+  low: 'secondary',
+  medium: 'outline',
+  high: 'destructive',
 }
 
 // ── Helper functions ─────────────────────────────────────────────────────────
@@ -52,7 +95,6 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('ru-RU', {
     style: 'currency',
     currency: 'RUB',
-    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value)
 }
@@ -69,31 +111,70 @@ function formatRelativeTime(dateStr: string): string {
   if (seconds < 60) return 'только что'
   if (minutes < 60) return `${minutes} мин. назад`
   if (hours < 24) return `${hours} ч. назад`
-  if (days < 30) return `${days} дн. назад`
+  if (days < 7) return `${days} дн. назад`
+  if (days < 30) return `${Math.floor(days / 7)} нед. назад`
   return new Date(dateStr).toLocaleDateString('ru-RU', {
-    month: 'short',
     day: 'numeric',
+    month: 'short',
   })
 }
 
-function getActivityIcon(action: string) {
-  const lower = action.toLowerCase()
-  if (lower.includes('created') || lower.includes('add') || lower.includes('new')) return UserPlus
-  if (lower.includes('updated') || lower.includes('edit') || lower.includes('changed')) return FileEdit
-  if (lower.includes('won') || lower.includes('closed') || lower.includes('completed')) return CheckCircle2
-  if (lower.includes('comment') || lower.includes('message') || lower.includes('note')) return MessageSquare
-  return Clock
+function getActivityIcon(type: string | null) {
+  switch (type) {
+    case 'звонок':
+      return Phone
+    case 'письмо':
+      return Mail
+    case 'whatsapp':
+      return MessageCircle
+    case 'встреча':
+      return User
+    case 'кп_отправлено':
+      return FileText
+    case 'заметка':
+      return StickyNote
+    case 'статус_изменен':
+      return CheckCircle2
+    default:
+      return StickyNote
+  }
 }
 
-// ── Stat card config ────────────────────────────────────────────────────────
+function getActivityTypeLabel(type: string | null): string {
+  switch (type) {
+    case 'звонок':
+      return 'Звонок'
+    case 'письмо':
+      return 'Письмо'
+    case 'whatsapp':
+      return 'WhatsApp'
+    case 'встреча':
+      return 'Встреча'
+    case 'кп_отправлено':
+      return 'КП отправлено'
+    case 'заметка':
+      return 'Заметка'
+    case 'статус_изменен':
+      return 'Статус изменен'
+    default:
+      return 'Активность'
+  }
+}
 
-interface StatCardConfig {
-  title: string
-  value: string
-  subtitle: string
-  icon: React.ElementType
-  iconBg: string
-  iconColor: string
+function getTodayString(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+function getMonthStartString(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+}
+
+function getThreeDaysAgoString(): string {
+  const d = new Date()
+  d.setDate(d.getDate() - 3)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
@@ -101,49 +182,188 @@ interface StatCardConfig {
 export function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [deals, setDeals] = useState<DealWithStage[]>([])
-  const [stages, setStages] = useState<PipelineStage[]>([])
+
+  // Data state
+  const [totalCompanies, setTotalCompanies] = useState(0)
+  const [newThisMonth, setNewThisMonth] = useState(0)
+  const [overdueCount, setOverdueCount] = useState(0)
+  const [funnelAmount, setFunnelAmount] = useState(0)
+  const [activeProposals, setActiveProposals] = useState(0)
+  const [todayTasks, setTodayTasks] = useState<TaskWithCompany[]>([])
+  const [todayTasksTotal, setTodayTasksTotal] = useState(0)
+  const [todayTasksDone, setTodayTasksDone] = useState(0)
+  const [companiesByStatus, setCompaniesByStatus] = useState<
+    { name: string; count: number; fill: string }[]
+  >([])
+  const [companiesBySource, setCompaniesBySource] = useState<
+    { name: string; value: number; fill: string }[]
+  >([])
   const [activities, setActivities] = useState<ActivityWithUser[]>([])
-  const [clientCount, setClientCount] = useState(0)
-  const [taskCount, setTaskCount] = useState(0)
-  const openDeal = useNavigationStore((s) => s.openDeal)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
 
     try {
-      const [dealsRes, stagesRes, activitiesRes, clientsRes, tasksRes] =
-        await Promise.all([
-          supabase
-            .from('deals')
-            .select('*, pipeline_stages(name, is_won, is_closed, color)'),
-          supabase
-            .from('pipeline_stages')
-            .select('*')
-            .order('position'),
-          supabase
-            .from('activities')
-            .select('*, users(name)')
-            .order('created_at', { ascending: false })
-            .limit(10),
-          supabase.from('clients').select('*', { count: 'exact', head: true }),
-          supabase.from('tasks').select('*', { count: 'exact', head: true }),
-        ])
+      const today = getTodayString()
+      const monthStart = getMonthStartString()
+      const threeDaysAgo = getThreeDaysAgoString()
 
-      if (dealsRes.error) throw dealsRes.error
-      if (stagesRes.error) throw stagesRes.error
-      if (activitiesRes.error) throw activitiesRes.error
-      if (clientsRes.error) throw clientsRes.error
+      // Run all queries in parallel
+      const [
+        companiesCountRes,
+        companiesNewRes,
+        overdueRes,
+        proposalsRes,
+        activeProposalsRes,
+        tasksRes,
+        tasksAllRes,
+        activitiesRes,
+      ] = await Promise.all([
+        // 1. Total companies count
+        supabase
+          .from('companies')
+          .select('*', { count: 'exact', head: true }),
+
+        // 2. New companies this month
+        supabase
+          .from('companies')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', monthStart),
+
+        // 3. Overdue contacts (next_contact_date older than 3 days ago)
+        supabase
+          .from('companies')
+          .select('*', { count: 'exact', head: true })
+          .not('next_contact_date', 'is', null)
+          .lt('next_contact_date', threeDaysAgo),
+
+        // 4. Funnel amount — proposals where status != отклонено
+        supabase
+          .from('proposals')
+          .select('total_amount')
+          .neq('status', 'отклонено'),
+
+        // 5. Active proposals count (status != отклонено)
+        supabase
+          .from('proposals')
+          .select('*', { count: 'exact', head: true })
+          .neq('status', 'отклонено'),
+
+        // 6. Today's tasks (deadline today or overdue, not done)
+        supabase
+          .from('tasks')
+          .select('*, company:companies!company_id(id, name)')
+          .neq('status', 'done')
+          .lte('deadline', today)
+          .order('priority', { ascending: false }),
+
+        // 7. Today's tasks total count (for done calculation)
+        supabase
+          .from('tasks')
+          .select('status')
+          .lte('deadline', today),
+
+        // 8. Last 10 activities with user info
+        supabase
+          .from('activities')
+          .select('*, user:users!user_id(id, name)')
+          .order('created_at', { ascending: false })
+          .limit(10),
+      ])
+
+      // Error checks
+      if (companiesCountRes.error) throw companiesCountRes.error
+      if (companiesNewRes.error) throw companiesNewRes.error
+      if (overdueRes.error) throw overdueRes.error
+      if (proposalsRes.error) throw proposalsRes.error
+      if (activeProposalsRes.error) throw activeProposalsRes.error
       if (tasksRes.error) throw tasksRes.error
+      if (tasksAllRes.error) throw tasksAllRes.error
+      if (activitiesRes.error) throw activitiesRes.error
 
-      setDeals((dealsRes.data as DealWithStage[]) ?? [])
-      setStages(stagesRes.data ?? [])
-      setActivities((activitiesRes.data as ActivityWithUser[]) ?? [])
-      setClientCount(clientsRes.count ?? 0)
-      setTaskCount(tasksRes.count ?? 0)
+      // 1. Total companies
+      setTotalCompanies(companiesCountRes.count ?? 0)
+
+      // 2. New this month
+      setNewThisMonth(companiesNewRes.count ?? 0)
+
+      // 3. Overdue contacts
+      setOverdueCount(overdueRes.count ?? 0)
+
+      // 4. Funnel amount
+      const proposals = proposalsRes.data ?? []
+      const total = proposals.reduce((sum, p) => sum + (p.total_amount ?? 0), 0)
+      setFunnelAmount(total)
+
+      // 5. Active proposals count
+      setActiveProposals(activeProposalsRes.count ?? 0)
+
+      // 6. Today's tasks
+      const taskData = (tasksRes.data as unknown as TaskWithCompany[]) ?? []
+      setTodayTasks(taskData)
+      setTodayTasksTotal(taskData.length)
+
+      // 7. Tasks done count
+      const allTasks = tasksAllRes.data ?? []
+      const doneCount = allTasks.filter((t) => t.status === 'done').length
+      setTodayTasksDone(doneCount)
+
+      // 8. Activities
+      const actData = (activitiesRes.data as unknown as ActivityWithUser[]) ?? []
+      setActivities(actData)
+
+      // ── Compute chart data from companies ──────────────────────────────
+      // Fetch all companies grouped by status and source for charts
+      const [companiesByStatusRes, companiesBySourceRes] = await Promise.all([
+        supabase.from('companies').select('status'),
+        supabase.from('companies').select('source'),
+      ])
+
+      if (companiesByStatusRes.error) throw companiesByStatusRes.error
+      if (companiesBySourceRes.error) throw companiesBySourceRes.error
+
+      // Bar chart — companies by status
+      const statusCounts: Record<string, number> = {}
+      for (const s of STATUS_ORDER) {
+        statusCounts[s] = 0
+      }
+      for (const c of companiesByStatusRes.data ?? []) {
+        if (c.status && statusCounts[c.status] !== undefined) {
+          statusCounts[c.status]++
+        }
+      }
+      setCompaniesByStatus(
+        STATUS_ORDER.map((s) => ({
+          name: s,
+          count: statusCounts[s],
+          fill: STATUS_COLORS[s],
+        })),
+      )
+
+      // Pie chart — companies by source
+      const sourceCounts: Record<string, number> = {}
+      for (const s of Object.keys(SOURCE_COLORS)) {
+        sourceCounts[s] = 0
+      }
+      for (const c of companiesBySourceRes.data ?? []) {
+        if (c.source && sourceCounts[c.source] !== undefined) {
+          sourceCounts[c.source]++
+        }
+      }
+      setCompaniesBySource(
+        Object.keys(SOURCE_COLORS)
+          .map((s) => ({
+            name: s,
+            value: sourceCounts[s],
+            fill: SOURCE_COLORS[s],
+          }))
+          .filter((d) => d.value > 0),
+      )
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось загрузить данные')
+      setError(
+        err instanceof Error ? err.message : 'Не удалось загрузить данные',
+      )
     } finally {
       setLoading(false)
     }
@@ -153,82 +373,26 @@ export function DashboardPage() {
     fetchData()
   }, [fetchData])
 
-  // ── Computed metrics ─────────────────────────────────────────────────────
+  // ── Toggle task done ───────────────────────────────────────────────────
 
-  const totalDeals = deals.length
-  const openDeals = deals.filter((d) => d.status === 'open').length
-  const wonDeals = deals.filter((d) => d.pipeline_stages?.is_won).length
-  const lostDeals = deals.filter((d) => d.status === 'lost').length
-  const totalRevenue = deals
-    .filter((d) => d.pipeline_stages?.is_won)
-    .reduce((sum, d) => sum + d.value, 0)
-  const pipelineValue = deals
-    .filter((d) => d.status === 'open')
-    .reduce((sum, d) => sum + d.value, 0)
-  const conversionRate =
-    totalDeals > 0 ? Math.round((wonDeals / totalDeals) * 100) : 0
+  const toggleTaskDone = useCallback(
+    async (taskId: string, currentlyDone: boolean) => {
+      const newStatus = currentlyDone ? 'todo' : 'done'
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({ status: newStatus })
+        .eq('id', taskId)
 
-  // ── Chart data ───────────────────────────────────────────────────────────
+      if (updateError) return
 
-  const dealsByStage = stages.map((stage) => ({
-    name: stage.name,
-    count: deals.filter((d) => d.stage_id === stage.id).length,
-    color: stage.color || '#888',
-  }))
-
-  const pieData = [
-    { name: 'Выиграно', value: wonDeals, color: 'oklch(0.696 0.17 162.48)' },
-    { name: 'Проиграно', value: lostDeals, color: 'oklch(0.577 0.245 27.325)' },
-    { name: 'Открытые', value: openDeals, color: 'oklch(0.627 0.265 303.9)' },
-  ].filter((d) => d.value > 0)
-
-  // ── Stat cards ───────────────────────────────────────────────────────────
-
-  const statCards: StatCardConfig[] = [
-    {
-      title: 'Все сделки',
-      value: totalDeals.toString(),
-      subtitle: `${openDeals} откр. \u00B7 ${lostDeals} проигр.`,
-      icon: Package,
-      iconBg: 'bg-blue-500',
-      iconColor: 'text-white',
+      setTodayTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)),
+      )
     },
-    {
-      title: 'Воронка',
-      value: formatCurrency(pipelineValue),
-      subtitle: `${openDeals} активных сделок`,
-      icon: DollarSign,
-      iconBg: 'bg-emerald-500/10',
-      iconColor: 'text-emerald-500',
-    },
-    {
-      title: 'Выиграно',
-      value: wonDeals.toString(),
-      subtitle: `${formatCurrency(totalRevenue)} выручка`,
-      icon: Trophy,
-      iconBg: 'bg-amber-500/10',
-      iconColor: 'text-amber-500',
-    },
-    {
-      title: 'Конверсия',
-      value: `${conversionRate}%`,
-      subtitle: 'Выиграно / Всего',
-      icon: Target,
-      iconBg: 'bg-violet-500/10',
-      iconColor: 'text-violet-500',
-    },
-  ]
+    [],
+  )
 
-  // ── Recent deals (sorted by created_at, take 5) ─────────────────────────
-
-  const recentDeals = [...deals]
-    .sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    )
-    .slice(0, 5)
-
-  // ── Custom tooltip for bar chart ─────────────────────────────────────────
+  // ── Custom tooltip for bar chart ───────────────────────────────────────
 
   function CustomBarTooltip({
     active,
@@ -241,32 +405,94 @@ export function DashboardPage() {
   }) {
     if (!active || !payload?.length) return null
     return (
-      <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-lg">
-        <p className="font-medium text-foreground">{label}</p>
+      <div className="rounded-lg border border-border bg-popover px-3 py-2 text-sm shadow-lg">
+        <p className="font-medium text-popover-foreground">{label}</p>
         <p className="text-muted-foreground">
-          {payload[0].value} сделок
+          {payload[0].value}{' '}
+          {payload[0].value === 1 ? 'клиент' : payload[0].value < 5 ? 'клиента' : 'клиентов'}
         </p>
       </div>
     )
   }
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // ── Custom tooltip for pie chart ───────────────────────────────────────
 
-  // Loading skeleton
+  function CustomPieTooltip({
+    active,
+    payload,
+  }: {
+    active?: boolean
+    payload?: { name: string; value: number }[]
+  }) {
+    if (!active || !payload?.length) return null
+    const d = payload[0]
+    return (
+      <div className="rounded-lg border border-border bg-popover px-3 py-2 text-sm shadow-lg">
+        <p className="font-medium text-popover-foreground">{d.name}</p>
+        <p className="text-muted-foreground">
+          {d.value}{' '}
+          {d.value === 1 ? 'клиент' : d.value < 5 ? 'клиента' : 'клиентов'}
+        </p>
+      </div>
+    )
+  }
+
+  // ── Stat card configs ──────────────────────────────────────────────────
+
+  const statCards = [
+    {
+      title: 'Всего клиентов',
+      value: totalCompanies.toLocaleString('ru-RU'),
+      subtitle: `${newThisMonth} новых за месяц`,
+      icon: Building2,
+      iconBg: 'bg-sky-500/10',
+      iconColor: 'text-sky-600 dark:text-sky-400',
+    },
+    {
+      title: 'Воронка',
+      value: formatCurrency(funnelAmount),
+      subtitle: `${activeProposals} активных КП`,
+      icon: TrendingUp,
+      iconBg: 'bg-emerald-500/10',
+      iconColor: 'text-emerald-600 dark:text-emerald-400',
+    },
+    {
+      title: 'Просрочено',
+      value: overdueCount.toString(),
+      subtitle: 'контакт просрочен',
+      icon: AlertTriangle,
+      iconBg: 'bg-amber-500/10',
+      iconColor: 'text-amber-600 dark:text-amber-400',
+    },
+    {
+      title: 'Задачи на сегодня',
+      value: todayTasksTotal.toString(),
+      subtitle: `${todayTasksDone} выполнено`,
+      icon: CheckSquare,
+      iconBg: 'bg-violet-500/10',
+      iconColor: 'text-violet-600 dark:text-violet-400',
+    },
+  ]
+
+  // ── Render: Loading skeleton ───────────────────────────────────────────
+
   if (loading) {
     return (
       <div className="space-y-6">
         {/* Stats row skeleton */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
+            <Card
+              key={i}
+              className="shadow-sm transition-shadow duration-200 hover:shadow-md"
+            >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-8 w-8 rounded-lg" />
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-9 w-9 rounded-lg" />
               </CardHeader>
               <CardContent>
-                <Skeleton className="mb-1 h-7 w-20" />
-                <Skeleton className="h-3 w-32" />
+                <Skeleton className="mb-2 h-7 w-24" />
+                <Skeleton className="h-3.5 w-36" />
               </CardContent>
             </Card>
           ))}
@@ -275,12 +501,15 @@ export function DashboardPage() {
         {/* Charts skeleton */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {Array.from({ length: 2 }).map((_, i) => (
-            <Card key={i} className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
+            <Card
+              key={i}
+              className="shadow-sm transition-shadow duration-200 hover:shadow-md"
+            >
               <CardHeader>
-                <Skeleton className="h-5 w-36" />
+                <Skeleton className="h-5 w-40" />
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-[280px] w-full" />
+                <Skeleton className="h-[300px] w-full" />
               </CardContent>
             </Card>
           ))}
@@ -289,17 +518,20 @@ export function DashboardPage() {
         {/* Bottom section skeleton */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {Array.from({ length: 2 }).map((_, i) => (
-            <Card key={i} className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
+            <Card
+              key={i}
+              className="shadow-sm transition-shadow duration-200 hover:shadow-md"
+            >
               <CardHeader>
-                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-5 w-44" />
               </CardHeader>
               <CardContent className="space-y-3">
-                {Array.from({ length: 4 }).map((_, j) => (
+                {Array.from({ length: 5 }).map((_, j) => (
                   <div key={j} className="flex items-start gap-3">
-                    <Skeleton className="h-8 w-8 rounded-lg" />
-                    <div className="flex-1 space-y-1">
+                    <Skeleton className="h-8 w-8 shrink-0 rounded-lg" />
+                    <div className="flex-1 space-y-2">
                       <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-3 w-28" />
                     </div>
                   </div>
                 ))}
@@ -311,49 +543,52 @@ export function DashboardPage() {
     )
   }
 
-  // Error state
+  // ── Render: Error state ────────────────────────────────────────────────
+
   if (error) {
     return (
-      <Card className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md flex flex-col items-center justify-center py-16">
+      <Card className="flex flex-col items-center justify-center py-16 shadow-sm">
         <AlertCircle className="mb-4 h-10 w-10 text-destructive" />
-        <h3 className="mb-1 text-lg font-semibold text-foreground">
-          Что-то пошло не так
-        </h3>
-        <p className="mb-4 text-sm text-muted-foreground">{error}</p>
+        <h3 className="mb-1 text-lg font-semibold">Что-то пошло не так</h3>
+        <p className="mb-5 max-w-md text-center text-sm text-muted-foreground">
+          {error}
+        </p>
         <button
           onClick={fetchData}
-          className="inline-flex items-center gap-2 rounded-xl shadow-sm shadow-primary/25 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
         >
-          <TrendingUp className="h-4 w-4" />
+          <RefreshCw className="h-4 w-4" />
           Попробовать снова
         </button>
       </Card>
     )
   }
 
+  // ── Render: Main dashboard ─────────────────────────────────────────────
+
   return (
     <div className="space-y-6">
-      {/* ── Stats Cards Row ──────────────────────────────────────────────── */}
+      {/* ── Row 1: Stat Cards ──────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((card) => {
           const Icon = card.icon
           return (
             <Card
               key={card.title}
-              className="rounded-2xl shadow-sm transition-all duration-200 hover:shadow-md hover:scale-[1.01]"
+              className="shadow-sm transition-all duration-200 hover:shadow-md hover:scale-[1.01]"
             >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <span className="text-sm font-medium text-muted-foreground">
                   {card.title}
                 </span>
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-lg ${card.iconBg}`}
+                  className={`flex h-9 w-9 items-center justify-center rounded-lg ${card.iconBg}`}
                 >
-                  <Icon className={`h-4 w-4 ${card.iconColor}`} />
+                  <Icon className={`h-4.5 w-4.5 ${card.iconColor}`} />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold tracking-tight text-foreground">
+                <div className="text-2xl font-bold tracking-tight">
                   {card.value}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -365,38 +600,46 @@ export function DashboardPage() {
         })}
       </div>
 
-      {/* ── Charts Section ───────────────────────────────────────────────── */}
+      {/* ── Row 2: Charts ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Bar Chart — Deals by Stage */}
-        <Card className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
+        {/* Horizontal Bar Chart — Воронка продаж */}
+        <Card className="shadow-sm transition-shadow duration-200 hover:shadow-md">
           <CardHeader>
-            <CardTitle className="text-base">Сделки по этапам</CardTitle>
+            <CardTitle className="text-base">Воронка продаж</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[280px]">
+            <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dealsByStage} barCategoryGap="20%">
+                <BarChart
+                  data={companiesByStatus}
+                  layout="vertical"
+                  barCategoryGap="25%"
+                  margin={{ top: 0, right: 20, bottom: 0, left: 0 }}
+                >
                   <CartesianGrid
                     strokeDasharray="3 3"
-                    stroke="oklch(0.5 0 0 / 15%)"
-                    vertical={false}
+                    stroke="hsl(var(--border))"
+                    horizontal={false}
                   />
                   <XAxis
-                    dataKey="name"
-                    tick={{ fill: 'oklch(0.556 0 0)', fontSize: 12 }}
+                    type="number"
+                    allowDecimals={false}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                     axisLine={false}
                     tickLine={false}
                   />
                   <YAxis
-                    allowDecimals={false}
-                    tick={{ fill: 'oklch(0.556 0 0)', fontSize: 12 }}
+                    type="category"
+                    dataKey="name"
+                    width={130}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                     axisLine={false}
                     tickLine={false}
                   />
                   <Tooltip content={<CustomBarTooltip />} cursor={false} />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={48}>
-                    {dealsByStage.map((entry, index) => (
-                      <Cell key={index} fill={entry.color} />
+                  <Bar dataKey="count" radius={[0, 6, 6, 0]} maxBarSize={36}>
+                    {companiesByStatus.map((entry, index) => (
+                      <Cell key={index} fill={entry.fill} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -405,52 +648,38 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Pie Chart — Deal Status Distribution */}
-        <Card className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
+        {/* Pie/Donut Chart — Клиенты по источникам */}
+        <Card className="shadow-sm transition-shadow duration-200 hover:shadow-md">
           <CardHeader>
             <CardTitle className="text-base">
-              Статус сделок
+              Клиенты по источникам
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[280px]">
-              {pieData.length > 0 ? (
+            <div className="h-[300px]">
+              {companiesBySource.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={pieData}
+                      data={companiesBySource}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={95}
-                      paddingAngle={4}
+                      innerRadius={65}
+                      outerRadius={100}
+                      paddingAngle={3}
                       dataKey="value"
                       strokeWidth={0}
                     >
-                      {pieData.map((entry, index) => (
-                        <Cell key={index} fill={entry.color} />
+                      {companiesBySource.map((entry, index) => (
+                        <Cell key={index} fill={entry.fill} />
                       ))}
                     </Pie>
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null
-                        const d = payload[0]
-                        return (
-                          <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-lg">
-                            <p className="font-medium text-foreground">
-                              {d.name}
-                            </p>
-                            <p className="text-muted-foreground">
-                              {d.value} сделок
-                            </p>
-                          </div>
-                        )
-                      }}
-                    />
+                    <Tooltip content={<CustomPieTooltip />} />
                     <Legend
                       verticalAlign="bottom"
                       iconType="circle"
                       iconSize={8}
+                      wrapperStyle={{ paddingTop: '8px' }}
                       formatter={(value: string) => (
                         <span className="text-sm text-muted-foreground">
                           {value}
@@ -461,7 +690,7 @@ export function DashboardPage() {
                 </ResponsiveContainer>
               ) : (
                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                  Нет данных о сделках
+                  Нет данных об источниках
                 </div>
               )}
             </div>
@@ -469,91 +698,133 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      {/* ── Bottom Section ───────────────────────────────────────────────── */}
+      {/* ── Row 3: Activities + Tasks ──────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent Deals */}
-        <Card className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
-          <CardHeader>
-            <CardTitle className="text-base">Последние сделки</CardTitle>
+        {/* Последние активности */}
+        <Card className="shadow-sm transition-shadow duration-200 hover:shadow-md">
+          <CardHeader className="flex flex-row items-center gap-2">
+            <Users className="h-4.5 w-4.5 text-muted-foreground" />
+            <CardTitle className="text-base">Последние активности</CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="max-h-[340px]">
-              {recentDeals.length === 0 ? (
-                <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
-                  Сделок пока нет
+            <ScrollArea className="h-[380px]">
+              {activities.length === 0 ? (
+                <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                  Нет активностей
                 </div>
               ) : (
-                <div className="space-y-1">
-                  {recentDeals.map((deal) => (
-                    <button
-                      key={deal.id}
-                      onClick={() => openDeal(deal.id)}
-                      className="flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors hover:bg-primary/5"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {deal.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatCurrency(deal.value)}
-                        </p>
+                <div className="space-y-1 pr-3">
+                  {activities.map((activity) => {
+                    const Icon = getActivityIcon(activity.type)
+                    const typeLabel = getActivityTypeLabel(activity.type)
+                    return (
+                      <div
+                        key={activity.id}
+                        className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-muted/50"
+                      >
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                          <Icon className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {typeLabel}
+                            </span>
+                            {activity.user && (
+                              <>
+                                <span className="text-muted-foreground/50">·</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {activity.user.name}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          <p className="mt-0.5 line-clamp-2 text-sm leading-snug">
+                            {activity.content}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground/70">
+                            {formatRelativeTime(activity.created_at)}
+                          </p>
+                        </div>
                       </div>
-                      {deal.pipeline_stages && (
-                        <Badge
-                          variant="secondary"
-                          className="ml-3 shrink-0 text-xs"
-                          style={{
-                            backgroundColor: `${deal.pipeline_stages.color}20`,
-                            color: deal.pipeline_stages.color,
-                            borderColor: `${deal.pipeline_stages.color}40`,
-                          }}
-                        >
-                          {deal.pipeline_stages.name}
-                        </Badge>
-                      )}
-                    </button>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </ScrollArea>
           </CardContent>
         </Card>
 
-        {/* Activity Feed */}
-        <Card className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
-          <CardHeader>
-            <CardTitle className="text-base">Лента активности</CardTitle>
+        {/* Задачи на сегодня */}
+        <Card className="shadow-sm transition-shadow duration-200 hover:shadow-md">
+          <CardHeader className="flex flex-row items-center gap-2">
+            <CheckSquare className="h-4.5 w-4.5 text-muted-foreground" />
+            <CardTitle className="text-base">Задачи на сегодня</CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="max-h-[340px]">
-              {activities.length === 0 ? (
-                <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
-                  Нет активности
+            <ScrollArea className="h-[380px]">
+              {todayTasks.length === 0 ? (
+                <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                  Нет задач на сегодня — отлично! 🎉
                 </div>
               ) : (
-                <div className="space-y-1">
-                  {activities.map((activity) => {
-                    const Icon = getActivityIcon(activity.action)
-                    const actorName =
-                      activity.users?.[0]?.name ?? 'Неизвестно'
+                <div className="space-y-1 pr-3">
+                  {todayTasks.map((task) => {
+                    const isDone = task.status === 'done'
+                    const priorityLabel =
+                      PRIORITY_LABELS[task.priority] ?? task.priority
+                    const priorityVariant =
+                      PRIORITY_VARIANTS[task.priority] ?? 'secondary'
+                    const isOverdue =
+                      task.deadline &&
+                      task.deadline < getTodayString() &&
+                      !isDone
+
                     return (
                       <div
-                        key={activity.id}
-                        className="flex items-start gap-3 rounded-lg p-3"
+                        key={task.id}
+                        className={`flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-muted/50 ${isDone ? 'opacity-60' : ''}`}
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                          <Icon className="h-4 w-4 text-muted-foreground" />
+                        <div className="mt-0.5">
+                          <Checkbox
+                            checked={isDone}
+                            onCheckedChange={() =>
+                              toggleTaskDone(task.id, isDone)
+                            }
+                          />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm text-foreground">
-                            <span className="font-medium">{actorName}</span>{' '}
-                            <span className="text-muted-foreground">
-                              {activity.action}
-                            </span>
+                          <p
+                            className={`text-sm leading-snug ${isDone ? 'line-through text-muted-foreground' : ''}`}
+                          >
+                            {task.title}
                           </p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {formatRelativeTime(activity.created_at)}
-                          </p>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <Badge variant={priorityVariant} className="text-[10px] px-1.5 py-0">
+                              {priorityLabel}
+                            </Badge>
+                            {task.company && (
+                              <span className="text-xs text-muted-foreground">
+                                {task.company.name}
+                              </span>
+                            )}
+                            {isOverdue && (
+                              <Badge
+                                variant="destructive"
+                                className="text-[10px] px-1.5 py-0"
+                              >
+                                Просрочено
+                              </Badge>
+                            )}
+                            {task.is_recurring && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] px-1.5 py-0"
+                              >
+                                Повторяющаяся
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )

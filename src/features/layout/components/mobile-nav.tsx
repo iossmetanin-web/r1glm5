@@ -2,7 +2,7 @@
 
 import {
   LayoutDashboard,
-  Kanban,
+  FileText,
   Users,
   CheckSquare,
   Settings,
@@ -23,7 +23,7 @@ interface MobileNavItem {
 
 const mobileNavItems: MobileNavItem[] = [
   { view: 'dashboard', label: 'Панель', icon: LayoutDashboard, color: 'bg-blue-500', tint: 'bg-blue-50', text: 'text-blue-600', iconColor: 'text-blue-500' },
-  { view: 'deals', label: 'Сделки', icon: Kanban, color: 'bg-amber-500', tint: 'bg-amber-50', text: 'text-amber-600', iconColor: 'text-amber-500' },
+  { view: 'proposals', label: 'КП', icon: FileText, color: 'bg-amber-500', tint: 'bg-amber-50', text: 'text-amber-600', iconColor: 'text-amber-500' },
   { view: 'companies', label: 'Клиенты', icon: Users, color: 'bg-emerald-500', tint: 'bg-emerald-50', text: 'text-emerald-600', iconColor: 'text-emerald-500' },
   { view: 'tasks', label: 'Задачи', icon: CheckSquare, color: 'bg-violet-500', tint: 'bg-violet-50', text: 'text-violet-600', iconColor: 'text-violet-500' },
   { view: 'settings', label: 'Настройки', icon: Settings, color: 'bg-gray-500', tint: 'bg-gray-50', text: 'text-gray-600', iconColor: 'text-gray-400' },

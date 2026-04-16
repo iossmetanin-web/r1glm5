@@ -25,18 +25,18 @@ import type { AppView } from '@/lib/store'
 
 const viewTitles: Record<AppView, string> = {
   dashboard: 'Панель',
-  deals: 'Сделки',
-  'deal-detail': 'Детали сделки',
-  contacts: 'Контакты',
+  companies: 'Клиенты',
+  'company-detail': 'Карточка клиента',
+  proposals: 'Коммерческие предложения',
   tasks: 'Задачи',
   settings: 'Настройки',
 }
 
 const viewColors: Record<AppView, string> = {
   dashboard: 'bg-blue-500',
-  deals: 'bg-amber-500',
-  'deal-detail': 'bg-amber-500',
-  contacts: 'bg-emerald-500',
+  companies: 'bg-emerald-500',
+  'company-detail': 'bg-emerald-500',
+  proposals: 'bg-amber-500',
   tasks: 'bg-violet-500',
   settings: 'bg-gray-500',
 }
@@ -76,7 +76,7 @@ export function Header() {
           <Menu className="h-4 w-4" />
         </Button>
 
-        {currentView === 'deal-detail' && (
+        {currentView === 'company-detail' && (
           <Button
             variant="ghost"
             size="icon"

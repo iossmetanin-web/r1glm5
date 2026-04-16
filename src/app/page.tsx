@@ -9,7 +9,7 @@ import { useNavigationStore, useAuthStore, restoreSession } from '@/lib/store'
 import { DashboardPage } from '@/features/dashboard/components/dashboard-page'
 import { CompaniesPage } from '@/features/companies/components/companies-page'
 import { CompanyDetailPage } from '@/features/companies/components/company-detail-page'
-import DealsPage from '@/features/deals/components/deals-page'
+import { ProposalsPage } from '@/features/proposals/components/proposals-page'
 import TasksPage from '@/features/tasks/components/tasks-page'
 import { SettingsPage } from '@/features/settings/components/settings-page'
 import { Loader2 } from 'lucide-react'
@@ -57,7 +57,7 @@ function AppContent() {
     dashboard: <DashboardPage />,
     companies: <CompaniesPage />,
     companyDetail: <CompanyDetailPage />,
-    deals: <DealsPage />,
+    proposals: <ProposalsPage />,
     tasks: <TasksPage />,
     settings: <SettingsPage />,
   }

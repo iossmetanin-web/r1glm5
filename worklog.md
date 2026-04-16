@@ -269,3 +269,49 @@ Stage Summary:
 - 8 files modified/created, ~2800 lines of new CRM-specific code
 - All Russian text, mobile-responsive, shadcn/ui components
 - Pending: Dashboard upgrade (funnel, conversion, overdue analytics)
+
+---
+Task ID: 10
+Agent: main + 3 subagents
+Task: CRM Structure Adaptation — Phase 2 (Dashboard, КП, Tasks, Navigation)
+
+Work Log:
+- Updated navigation system for CRM adaptation:
+  - store.ts: Replaced AppView type (deals → proposals), removed openDeal/selectedDealId
+  - sidebar.tsx: "Сделки" → "КП" (Kanban → FileText icon)
+  - mobile-nav.tsx: Same change, "Сделки" → "КП"
+  - header.tsx: Updated viewTitles/viewColors maps, deal-detail → company-detail back button
+- Rewrote Dashboard (subagent):
+  - 4 stat cards: Всего клиентов (with monthly new), Воронка (proposal total), Просрочено (>3 days), Задачи на сегодня
+  - Horizontal bar chart: Воронка продаж by 4 statuses (color-coded)
+  - Donut chart: Клиенты по источникам (4 sources)
+  - Last 10 activities with type-specific icons + user names
+  - Today's tasks with checkbox toggle, priority badges, company names
+- Created ProposalsPage (subagent):
+  - New file: src/features/proposals/components/proposals-page.tsx
+  - Full CRUD for КП with status/manager filters
+  - Desktop table + mobile cards layout
+  - Expandable proposal detail with line items table
+  - Create/Edit dialog with dynamic line items (product, qty, price, auto-total)
+  - Status change with activity logging
+  - Company name clickable → navigates to company detail
+- Rewrote TasksPage (subagent):
+  - Filter tabs: Все / На сегодня / Просроченные / Выполненные (with counts)
+  - Recurring tasks (is_recurring + recurrence_days) with auto-generation on completion
+  - Shared tasks (is_shared) visible to all managers
+  - Company association (clickable badge → company detail)
+  - Russian priority labels (Низкий/Средний/Высокий)
+  - Overdue highlighting with red border + "Просрочено" badge
+  - Relative deadline labels (сегодня/завтра/просрочено)
+- Updated page.tsx: mapped ProposalsPage to 'proposals' view, removed DealsPage import
+- Ran lint: 0 errors, dev server running clean
+
+Stage Summary:
+- Phase 2 complete: Dashboard analytics, КП management, enhanced Tasks
+- 8 files modified, 3 new files created, ~3500+ lines of new code
+- Navigation fully adapted: Deals → КП across sidebar/mobile-nav/header/store
+- Dashboard shows real CRM metrics (funnel, sources, overdue, tasks)
+- КП page has full CRUD with calculator (dynamic line items)
+- Tasks support recurring, shared, company-linked, today queue views
+- All Russian text, mobile-responsive, shadcn/ui components
+- Old deals-page.tsx still exists but is no longer imported (dead code)
