@@ -165,3 +165,31 @@ Stage Summary:
 - `restoreSession()` idempotent + ref-guarded = safe against HMR
 - `logout()` properly awaits Supabase signOut before state clears
 - `.next` cache nuked, fresh build confirmed working
+
+---
+Task ID: 7
+Agent: main
+Task: Final verification — confirm user picker is completely removed from entire project
+
+Work Log:
+- Exhaustive grep of ENTIRE project (including .next compiled output) for:
+  - "Выберите пользователя для входа" → ZERO matches anywhere (source + compiled)
+  - "UserPicker", "user_picker", "user-picker" → ZERO matches
+  - "crm_user_id", "mockUser", "fakeUser", "DEMO_USERS" → ZERO matches in source (only in worklog.md history)
+- Verified all auth render paths:
+  - `src/app/page.tsx`: `if (!currentUser) return <LoginForm />` — ONLY LoginForm, zero alternatives
+  - `src/features/layout/components/app-shell.tsx`: pure layout, NO auth logic
+  - `src/features/auth/components/login-form.tsx`: email/password Supabase Auth form
+  - `src/lib/store.ts`: pure Supabase Auth, no localStorage, idempotent restoreSession
+  - `src/features/auth/components/auth-provider.tsx`: Supabase Auth context, no user picker
+- Confirmed zero "picker", "select-user" component files exist in src/
+- Nuked `.next` cache (166MB) completely and restarted dev server from scratch
+- Fresh compilation: GET / 200 OK, zero user picker references in compiled output
+- Dev server running on port 3000 with clean build
+
+Stage Summary:
+- Source code is 100% clean — user picker text, component, and all references do NOT exist anywhere
+- The string "Выберите пользователя для входа" literally does not exist in any file in the project
+- Auth flow is: Supabase session check → if no session → LoginForm (email/password) → CRM app
+- Zero fallbacks, zero fake users, zero localStorage auth, zero user picker
+- Dev server freshly compiled from clean source — any cached ghost UI is now definitively eliminated
