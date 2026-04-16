@@ -18,11 +18,11 @@ interface MobileNavItem {
 }
 
 const mobileNavItems: MobileNavItem[] = [
-  { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { view: 'deals', label: 'Deals', icon: Kanban },
-  { view: 'contacts', label: 'Contacts', icon: Users },
-  { view: 'tasks', label: 'Tasks', icon: CheckSquare },
-  { view: 'settings', label: 'More', icon: Settings },
+  { view: 'dashboard', label: 'Панель', icon: LayoutDashboard },
+  { view: 'deals', label: 'Сделки', icon: Kanban },
+  { view: 'contacts', label: 'Контакты', icon: Users },
+  { view: 'tasks', label: 'Задачи', icon: CheckSquare },
+  { view: 'settings', label: 'Ещё', icon: Settings },
 ]
 
 export function MobileNav() {

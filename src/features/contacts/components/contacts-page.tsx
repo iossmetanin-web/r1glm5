@@ -34,7 +34,7 @@ import { Plus, Search, Pencil, Trash2, Users, AlertCircle } from 'lucide-react'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type ContactStage = 'Lead' | 'Negotiation' | 'Customer' | 'Churned'
+type ContactStage = 'Лид' | 'Переговоры' | 'Клиент' | 'Отток'
 
 interface ContactFormData {
   name: string
@@ -44,13 +44,13 @@ interface ContactFormData {
   stage: ContactStage
 }
 
-const STAGE_OPTIONS: ContactStage[] = ['Lead', 'Negotiation', 'Customer', 'Churned']
+const STAGE_OPTIONS: ContactStage[] = ['Лид', 'Переговоры', 'Клиент', 'Отток']
 
 const STAGE_BADGE_MAP: Record<string, { cls: string }> = {
-  lead: { cls: 'bg-muted text-muted-foreground hover:bg-muted/80' },
-  negotiation: { cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 border-amber-500/25' },
-  customer: { cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/25' },
-  churned: { cls: 'bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/20 border-red-500/25' },
+  'лид': { cls: 'bg-muted text-muted-foreground hover:bg-muted/80' },
+  'переговоры': { cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 border-amber-500/25' },
+  'клиент': { cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/25' },
+  'отток': { cls: 'bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/20 border-red-500/25' },
 }
 
 const EMPTY_FORM: ContactFormData = {
@@ -58,14 +58,14 @@ const EMPTY_FORM: ContactFormData = {
   company: '',
   phone: '',
   email: '',
-  stage: 'Lead',
+  stage: 'Лид',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr)
-  return date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString('ru-RU', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -74,7 +74,7 @@ function formatDate(dateStr: string): string {
 
 function getStageBadgeVariant(stage: string | null): string {
   if (!stage) return ''
-  return STAGE_BADGE_MAP[stage.toLowerCase()]?.cls ?? STAGE_BADGE_MAP.lead.cls
+  return STAGE_BADGE_MAP[stage.toLowerCase()]?.cls ?? STAGE_BADGE_MAP['лид'].cls
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -119,7 +119,7 @@ export default function ContactsPage() {
         }
       } catch (err: unknown) {
         if (cancelled) return
-        const message = err instanceof Error ? err.message : 'Failed to load contacts'
+        const message = err instanceof Error ? err.message : 'Не удалось загрузить контакты'
         setError(message)
       }
       setLoading(false)
@@ -163,7 +163,7 @@ export default function ContactsPage() {
       company: contact.company ?? '',
       phone: contact.phone ?? '',
       email: contact.email ?? '',
-      stage: (contact.stage as ContactStage) || 'Lead',
+      stage: (contact.stage as ContactStage) || 'Лид',
     })
     setDialogOpen(true)
   }
@@ -189,7 +189,7 @@ export default function ContactsPage() {
 
         if (!updateError) {
           await supabase.from('activities').insert({
-            action: `Updated contact "${form.name.trim()}"`,
+            action: `Обновлён контакт «${form.name.trim()}»`,
             entity_type: 'client',
             entity_id: editingContact.id,
             user_id: currentUser?.id,
@@ -210,7 +210,7 @@ export default function ContactsPage() {
 
         if (!insertError) {
           await supabase.from('activities').insert({
-            action: `Created contact "${form.name.trim()}"`,
+            action: `Создан контакт «${form.name.trim()}»`,
             entity_type: 'client',
             user_id: currentUser?.id,
           })
@@ -230,7 +230,7 @@ export default function ContactsPage() {
   // ─── Delete ───────────────────────────────────────────────────────────────
 
   const handleDelete = async (contact: Client) => {
-    if (!window.confirm(`Delete "${contact.name}"? This action cannot be undone.`)) return
+    if (!window.confirm(`Удалить "${contact.name}"? Это действие нельзя отменить.`)) return
 
     const { error: deleteError } = await supabase
       .from('clients')
@@ -239,7 +239,7 @@ export default function ContactsPage() {
 
     if (!deleteError) {
       await supabase.from('activities').insert({
-        action: `Deleted contact "${contact.name}"`,
+        action: `Удалён контакт «${contact.name}»`,
         entity_type: 'client',
         entity_id: contact.id,
         user_id: currentUser?.id,
@@ -257,12 +257,13 @@ export default function ContactsPage() {
         <div>
           <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
             <Users className="h-5 w-5 text-muted-foreground" />
-            Contacts
+            Контакты
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
+            {contacts.length}{' '}
+            {contacts.length === 1 ? 'контакт' : contacts.length < 5 ? 'контакта' : 'контактов'}
             {searchQuery.trim() && filteredContacts.length !== contacts.length
-              ? ` · ${filteredContacts.length} found`
+              ? ` · ${filteredContacts.length} найдено`
               : ''}
           </p>
         </div>
@@ -270,7 +271,7 @@ export default function ContactsPage() {
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search contacts…"
+              placeholder="Поиск контактов…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 w-full sm:w-[220px] h-9"
@@ -278,7 +279,7 @@ export default function ContactsPage() {
           </div>
           <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
             <Plus className="h-4 w-4" />
-            Add Contact
+            Добавить контакт
           </Button>
         </div>
       </div>
@@ -289,7 +290,7 @@ export default function ContactsPage() {
           <AlertCircle className="h-10 w-10 text-destructive" />
           <p className="text-sm text-muted-foreground max-w-md text-center">{error}</p>
           <Button variant="outline" size="sm" onClick={refresh}>
-            Retry
+            Повторить
           </Button>
         </div>
       )}
@@ -298,7 +299,7 @@ export default function ContactsPage() {
       {loading && (
         <div className="border border-border rounded-lg overflow-hidden">
           <div className="bg-muted/50 px-4 py-3 flex gap-6">
-            {['Name', 'Company', 'Phone', 'Email', 'Stage', 'Created', ''].map(
+            {['Имя', 'Компания', 'Телефон', 'Email', 'Этап', 'Создан', ''].map(
               (col) => (
                 <Skeleton key={col} className="h-4 w-16" />
               )
@@ -321,14 +322,14 @@ export default function ContactsPage() {
             <Users className="h-7 w-7 text-muted-foreground" />
           </div>
           <div className="text-center">
-            <p className="text-base font-medium text-foreground">No contacts</p>
+            <p className="text-base font-medium text-foreground">Нет контактов</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Add your first contact to get started
+              Добавьте первый контакт, чтобы начать
             </p>
           </div>
           <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
             <Plus className="h-4 w-4" />
-            Add Contact
+            Добавить контакт
           </Button>
         </div>
       )}
@@ -338,14 +339,14 @@ export default function ContactsPage() {
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Search className="h-8 w-8 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            No contacts found for &ldquo;{searchQuery}&rdquo;
+            Контакты по запросу &ldquo;{searchQuery}&rdquo; не найдены
           </p>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setSearchQuery('')}
           >
-            Clear
+            Очистить
           </Button>
         </div>
       )}
@@ -357,12 +358,12 @@ export default function ContactsPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
-                  <TableHead className="pl-4">Name</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Phone</TableHead>
+                  <TableHead className="pl-4">Имя</TableHead>
+                  <TableHead>Компания</TableHead>
+                  <TableHead>Телефон</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Stage</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead>Этап</TableHead>
+                  <TableHead>Создан</TableHead>
                   <TableHead className="pr-4 text-right"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -386,7 +387,7 @@ export default function ContactsPage() {
                         variant="outline"
                         className={`text-xs capitalize ${getStageBadgeVariant(contact.stage)}`}
                       >
-                        {contact.stage || 'Lead'}
+                        {contact.stage || 'Лид'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
@@ -397,14 +398,14 @@ export default function ContactsPage() {
                         <button
                           onClick={() => openEditDialog(contact)}
                           className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                          aria-label={`Edit ${contact.name}`}
+                          aria-label={`Редактировать ${contact.name}`}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => handleDelete(contact)}
                           className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                          aria-label={`Delete ${contact.name}`}
+                          aria-label={`Удалить ${contact.name}`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -432,12 +433,12 @@ export default function ContactsPage() {
               {editingContact ? (
                 <>
                   <Pencil className="h-5 w-5" />
-                  Edit Contact
+                  Редактировать контакт
                 </>
               ) : (
                 <>
                   <Plus className="h-5 w-5" />
-                  New Contact
+                  Новый контакт
                 </>
               )}
             </DialogTitle>
@@ -446,11 +447,11 @@ export default function ContactsPage() {
             {/* Name */}
             <div className="space-y-2">
               <Label htmlFor="contact-name">
-                Name <span className="text-destructive">*</span>
+                Имя <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="contact-name"
-                placeholder="e.g. John Smith"
+                placeholder="напр. Иван Иванов"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 onKeyDown={(e) => {
@@ -461,10 +462,10 @@ export default function ContactsPage() {
 
             {/* Company */}
             <div className="space-y-2">
-              <Label htmlFor="contact-company">Company</Label>
+              <Label htmlFor="contact-company">Компания</Label>
               <Input
                 id="contact-company"
-                placeholder="e.g. Acme Corp"
+                placeholder={'напр. ООО "Вектор"'}
                 value={form.company}
                 onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
               />
@@ -473,10 +474,10 @@ export default function ContactsPage() {
             {/* Phone + Email */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="contact-phone">Phone</Label>
+                <Label htmlFor="contact-phone">Телефон</Label>
                 <Input
                   id="contact-phone"
-                  placeholder="+1 (555) 000-0000"
+                  placeholder="+7 (999) 000-0000"
                   value={form.phone}
                   onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                 />
@@ -495,13 +496,13 @@ export default function ContactsPage() {
 
             {/* Stage */}
             <div className="space-y-2">
-              <Label>Stage</Label>
+              <Label>Этап</Label>
               <Select
                 value={form.stage}
                 onValueChange={(v) => setForm((f) => ({ ...f, stage: v as ContactStage }))}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select stage" />
+                  <SelectValue placeholder="Выберите этап" />
                 </SelectTrigger>
                 <SelectContent>
                   {STAGE_OPTIONS.map((stage) => (
@@ -523,17 +524,17 @@ export default function ContactsPage() {
                   setForm(EMPTY_FORM)
                 }}
               >
-                Cancel
+                Отмена
               </Button>
               <Button
                 onClick={handleSave}
                 disabled={!form.name.trim() || saving}
               >
                 {saving
-                  ? 'Saving...'
+                  ? 'Сохранение...'
                   : editingContact
-                    ? 'Update Contact'
-                    : 'Create Contact'}
+                    ? 'Обновить контакт'
+                    : 'Создать контакт'}
               </Button>
             </div>
           </div>

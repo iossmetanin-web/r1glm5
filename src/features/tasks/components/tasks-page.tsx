@@ -56,10 +56,10 @@ interface TaskFormData {
 }
 
 const STATUS_TABS: { value: FilterTab; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'todo', label: 'To Do' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'done', label: 'Done' },
+  { value: 'all', label: 'Все' },
+  { value: 'todo', label: 'К выполнению' },
+  { value: 'in_progress', label: 'В работе' },
+  { value: 'done', label: 'Выполнено' },
 ]
 
 const PRIORITY_OPTIONS: TaskPriority[] = ['low', 'medium', 'high']
@@ -86,19 +86,19 @@ function formatDeadline(dateStr: string | null): string {
   now.setHours(0, 0, 0, 0)
   const diffDays = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
-  const formatted = date.toLocaleDateString('en-US', {
+  const formatted = date.toLocaleDateString('ru-RU', {
     month: 'short',
     day: 'numeric',
   })
 
-  if (diffDays < 0) return `${formatted} (overdue)`
-  if (diffDays === 0) return `${formatted} (today)`
-  if (diffDays === 1) return `${formatted} (tomorrow)`
+  if (diffDays < 0) return `${formatted} (просрочено)`
+  if (diffDays === 0) return `${formatted} (сегодня)`
+  if (diffDays === 1) return `${formatted} (завтра)`
   return formatted
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  return new Date(dateStr).toLocaleDateString('ru-RU', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -153,7 +153,7 @@ export default function TasksPage() {
         }
       } catch (err: unknown) {
         if (cancelled) return
-        const message = err instanceof Error ? err.message : 'Failed to load tasks'
+        const message = err instanceof Error ? err.message : 'Не удалось загрузить задачи'
         setError(message)
       }
       setLoading(false)
@@ -198,8 +198,8 @@ export default function TasksPage() {
     if (!updateError) {
       await supabase.from('activities').insert({
         action: newStatus === 'done'
-          ? `Completed task "${task.title}"`
-          : `Reopened task "${task.title}"`,
+          ? `Выполнена задача «${task.title}»`
+          : `Задача «${task.title}» возвращена в работу`,
         entity_type: 'task',
         entity_id: task.id,
         user_id: currentUser?.id,
@@ -246,7 +246,7 @@ export default function TasksPage() {
 
         if (!updateError) {
           await supabase.from('activities').insert({
-            action: `Updated task "${form.title.trim()}"`,
+            action: `Обновлена задача «${form.title.trim()}»`,
             entity_type: 'task',
             entity_id: editingTask.id,
             user_id: currentUser?.id,
@@ -267,7 +267,7 @@ export default function TasksPage() {
 
         if (!insertError) {
           await supabase.from('activities').insert({
-            action: `Created task "${form.title.trim()}"`,
+            action: `Создана задача «${form.title.trim()}»`,
             entity_type: 'task',
             user_id: currentUser?.id,
           })
@@ -287,7 +287,7 @@ export default function TasksPage() {
   // ─── Delete ───────────────────────────────────────────────────────────────
 
   const handleDelete = async (task: Task) => {
-    if (!window.confirm(`Delete "${task.title}"? This action cannot be undone.`)) return
+    if (!window.confirm(`Удалить "${task.title}"? Это действие нельзя отменить.`)) return
 
     const { error: deleteError } = await supabase
       .from('tasks')
@@ -296,7 +296,7 @@ export default function TasksPage() {
 
     if (!deleteError) {
       await supabase.from('activities').insert({
-        action: `Deleted task "${task.title}"`,
+        action: `Удалена задача «${task.title}»`,
         entity_type: 'task',
         entity_id: task.id,
         user_id: currentUser?.id,
@@ -314,10 +314,10 @@ export default function TasksPage() {
         <div>
           <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
             <CheckSquare className="h-5 w-5 text-muted-foreground" />
-            Tasks
+            Задачи
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {tasks.length} tasks total
+            {tasks.length} задач всего
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -342,7 +342,7 @@ export default function TasksPage() {
           </div>
           <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
             <Plus className="h-4 w-4" />
-            Add Task
+            Добавить задачу
           </Button>
         </div>
       </div>
@@ -355,7 +355,7 @@ export default function TasksPage() {
           <AlertCircle className="h-10 w-10 text-destructive" />
           <p className="text-sm text-muted-foreground max-w-md text-center">{error}</p>
           <Button variant="outline" size="sm" onClick={refresh}>
-            Retry
+            Повторить
           </Button>
         </div>
       )}
@@ -388,14 +388,14 @@ export default function TasksPage() {
             <CheckSquare className="h-7 w-7 text-muted-foreground" />
           </div>
           <div className="text-center">
-            <p className="text-base font-medium text-foreground">No tasks</p>
+            <p className="text-base font-medium text-foreground">Нет задач</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Create your first task
+              Создайте первую задачу
             </p>
           </div>
           <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
             <Plus className="h-4 w-4" />
-              Add Task
+            Добавить задачу
           </Button>
         </div>
       )}
@@ -405,14 +405,14 @@ export default function TasksPage() {
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <CheckSquare className="h-8 w-8 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            No tasks in this category
+            Нет задач в этой категории
           </p>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setActiveTab('all')}
           >
-            Show all
+            Показать все
           </Button>
         </div>
       )}
@@ -437,7 +437,7 @@ export default function TasksPage() {
                       checked={isDone}
                       onCheckedChange={() => toggleDone(task)}
                       className="h-5 w-5 rounded-[4px]"
-                      aria-label={`Mark "${task.title}" as ${isDone ? 'not done' : 'done'}`}
+                      aria-label={`${isDone ? 'Отменить выполнение' : 'Выполнить'}: ${task.title}`}
                     />
                   </div>
 
@@ -458,7 +458,7 @@ export default function TasksPage() {
                       <div className="flex items-center gap-2 shrink-0">
                         <Badge
                           variant="outline"
-                          className={`text-[10px] font-medium capitalize border-transparent ${PRIORITY_BADGE[priority]}`}
+                          className={`text-[10px] font-medium border-transparent ${PRIORITY_BADGE[priority]}`}
                         >
                           {priority}
                         </Badge>
@@ -478,7 +478,7 @@ export default function TasksPage() {
                           <DropdownMenuTrigger asChild>
                             <button
                               className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                              aria-label="Task actions"
+                              aria-label="Действия с задачей"
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </button>
@@ -486,14 +486,14 @@ export default function TasksPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => openEditDialog(task)}>
                               <Pencil className="h-3.5 w-3.5 mr-2" />
-                              Edit
+                              Изменить
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => handleDelete(task)}
                             >
                               <Trash2 className="h-3.5 w-3.5 mr-2" />
-                              Delete
+                              Удалить
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -510,7 +510,7 @@ export default function TasksPage() {
                     {/* Bottom meta row */}
                     <div className="flex items-center gap-2 mt-1.5">
                       <span className="text-[11px] text-muted-foreground">
-                        Created {formatDate(task.created_at)}
+                        Создано {formatDate(task.created_at)}
                       </span>
                     </div>
                   </div>
@@ -538,12 +538,12 @@ export default function TasksPage() {
               {editingTask ? (
                 <>
                   <Pencil className="h-5 w-5" />
-                  Edit Task
+                  Редактировать задачу
                 </>
               ) : (
                 <>
                   <Plus className="h-5 w-5" />
-                  New Task
+                  Новая задача
                 </>
               )}
             </DialogTitle>
@@ -552,11 +552,11 @@ export default function TasksPage() {
             {/* Title */}
             <div className="space-y-2">
               <Label htmlFor="task-title">
-                Title <span className="text-destructive">*</span>
+                Название <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="task-title"
-                placeholder="e.g. Follow up with client"
+                placeholder="напр. Связаться с клиентом"
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                 onKeyDown={(e) => {
@@ -570,10 +570,10 @@ export default function TasksPage() {
 
             {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="task-description">Description</Label>
+              <Label htmlFor="task-description">Описание</Label>
               <Textarea
                 id="task-description"
-                placeholder="Add details about this task (optional)"
+                placeholder="Добавьте описание задачи (необязательно)"
                 value={form.description}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, description: e.target.value }))
@@ -586,7 +586,7 @@ export default function TasksPage() {
             {/* Priority + Deadline */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Priority</Label>
+                <Label>Приоритет</Label>
                 <Select
                   value={form.priority}
                   onValueChange={(v) =>
@@ -594,7 +594,7 @@ export default function TasksPage() {
                   }
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select priority" />
+                    <SelectValue placeholder="Выберите приоритет" />
                   </SelectTrigger>
                   <SelectContent>
                     {PRIORITY_OPTIONS.map((p) => (
@@ -606,7 +606,7 @@ export default function TasksPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="task-deadline">Deadline</Label>
+                <Label htmlFor="task-deadline">Срок</Label>
                 <Input
                   id="task-deadline"
                   type="date"
@@ -628,17 +628,17 @@ export default function TasksPage() {
                   setForm(EMPTY_FORM)
                 }}
               >
-                Cancel
+                Отмена
               </Button>
               <Button
                 onClick={handleSave}
                 disabled={!form.title.trim() || saving}
               >
                 {saving
-                  ? 'Saving...'
+                  ? 'Сохранение...'
                   : editingTask
-                    ? 'Update'
-                    : 'Create Task'}
+                    ? 'Обновить'
+                    : 'Создать задачу'}
               </Button>
             </div>
           </div>

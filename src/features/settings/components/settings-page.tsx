@@ -41,9 +41,9 @@ export function SettingsPage() {
     : '??'
 
   const roleLabel: Record<string, string> = {
-    admin: 'Admin',
-    manager: 'Manager',
-    user: 'User',
+    admin: 'Администратор',
+    manager: 'Менеджер',
+    user: 'Пользователь',
   }
 
   return (
@@ -53,9 +53,9 @@ export function SettingsPage() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
-            Profile
+            Профиль
           </CardTitle>
-          <CardDescription>Your account information</CardDescription>
+          <CardDescription>Информация о вашем аккаунте</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
@@ -66,7 +66,7 @@ export function SettingsPage() {
             </Avatar>
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold text-foreground truncate">
-                {currentUser?.name ?? 'User'}
+                {currentUser?.name ?? 'Пользователь'}
               </p>
               <div className="flex items-center gap-2 mt-1">
                 <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -90,9 +90,9 @@ export function SettingsPage() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Sun className="h-4 w-4 text-muted-foreground" />
-            Appearance
+            Внешний вид
           </CardTitle>
-          <CardDescription>Customize the app theme</CardDescription>
+          <CardDescription>Настройте тему приложения</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
@@ -105,9 +105,9 @@ export function SettingsPage() {
                 )}
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">Theme</p>
+                <p className="text-sm font-medium text-foreground">Тема</p>
                 <p className="text-xs text-muted-foreground">
-                  {resolvedTheme === 'dark' ? 'Dark' : 'Light'}
+                  {resolvedTheme === 'dark' ? 'Тёмная' : 'Светлая'}
                 </p>
               </div>
             </div>
@@ -119,19 +119,19 @@ export function SettingsPage() {
                 <SelectItem value="light">
                   <span className="flex items-center gap-2">
                     <Sun className="h-3.5 w-3.5" />
-                    Light
+                    Светлая
                   </span>
                 </SelectItem>
                 <SelectItem value="dark">
                   <span className="flex items-center gap-2">
                     <Moon className="h-3.5 w-3.5" />
-                    Dark
+                    Тёмная
                   </span>
                 </SelectItem>
                 <SelectItem value="system">
                   <span className="flex items-center gap-2">
                     <Monitor className="h-3.5 w-3.5" />
-                    System
+                    Системная
                   </span>
                 </SelectItem>
               </SelectContent>
@@ -145,7 +145,7 @@ export function SettingsPage() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Monitor className="h-4 w-4 text-muted-foreground" />
-            Quick Switch
+            Быстрое переключение
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -161,7 +161,7 @@ export function SettingsPage() {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-500/20">
                 <Sun className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
-              <span className="text-xs font-medium text-foreground">Light</span>
+              <span className="text-xs font-medium text-foreground">Светлая</span>
             </button>
             <button
               onClick={() => setTheme('dark')}
@@ -174,7 +174,7 @@ export function SettingsPage() {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-500/20">
                 <Moon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               </div>
-              <span className="text-xs font-medium text-foreground">Dark</span>
+              <span className="text-xs font-medium text-foreground">Тёмная</span>
             </button>
             <button
               onClick={() => setTheme('system')}
@@ -187,7 +187,7 @@ export function SettingsPage() {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
                 <Monitor className="h-5 w-5 text-foreground" />
               </div>
-              <span className="text-xs font-medium text-foreground">System</span>
+              <span className="text-xs font-medium text-foreground">Системная</span>
             </button>
           </div>
         </CardContent>
@@ -198,7 +198,7 @@ export function SettingsPage() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Info className="h-4 w-4 text-muted-foreground" />
-            About
+            О приложении
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -222,7 +222,7 @@ export function SettingsPage() {
         onClick={logout}
       >
         <LogOut className="mr-2 h-4 w-4" />
-        Sign out
+        Выйти
       </Button>
     </div>
   )

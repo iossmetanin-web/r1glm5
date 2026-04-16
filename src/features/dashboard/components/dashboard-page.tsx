@@ -66,11 +66,11 @@ function formatRelativeTime(dateStr: string): string {
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
 
-  if (seconds < 60) return 'just now'
-  if (minutes < 60) return `${minutes} min ago`
-  if (hours < 24) return `${hours} h ago`
-  if (days < 30) return `${days} d ago`
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  if (seconds < 60) return 'только что'
+  if (minutes < 60) return `${minutes} мин. назад`
+  if (hours < 24) return `${hours} ч. назад`
+  if (days < 30) return `${days} дн. назад`
+  return new Date(dateStr).toLocaleDateString('ru-RU', {
     month: 'short',
     day: 'numeric',
   })
@@ -143,7 +143,7 @@ export function DashboardPage() {
       setClientCount(clientsRes.count ?? 0)
       setTaskCount(tasksRes.count ?? 0)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
+      setError(err instanceof Error ? err.message : 'Не удалось загрузить данные')
     } finally {
       setLoading(false)
     }
@@ -177,42 +177,42 @@ export function DashboardPage() {
   }))
 
   const pieData = [
-    { name: 'Won', value: wonDeals, color: 'oklch(0.696 0.17 162.48)' },
-    { name: 'Lost', value: lostDeals, color: 'oklch(0.577 0.245 27.325)' },
-    { name: 'Open', value: openDeals, color: 'oklch(0.627 0.265 303.9)' },
+    { name: 'Выиграно', value: wonDeals, color: 'oklch(0.696 0.17 162.48)' },
+    { name: 'Проиграно', value: lostDeals, color: 'oklch(0.577 0.245 27.325)' },
+    { name: 'Открытые', value: openDeals, color: 'oklch(0.627 0.265 303.9)' },
   ].filter((d) => d.value > 0)
 
   // ── Stat cards ───────────────────────────────────────────────────────────
 
   const statCards: StatCardConfig[] = [
     {
-      title: 'All Deals',
+      title: 'Все сделки',
       value: totalDeals.toString(),
-      subtitle: `${openDeals} open \u00B7 ${lostDeals} lost`,
+      subtitle: `${openDeals} откр. \u00B7 ${lostDeals} проигр.`,
       icon: Package,
       iconBg: 'bg-primary/10',
       iconColor: 'text-primary',
     },
     {
-      title: 'Pipeline',
+      title: 'Воронка',
       value: formatCurrency(pipelineValue),
-      subtitle: `${openDeals} active deals`,
+      subtitle: `${openDeals} активных сделок`,
       icon: DollarSign,
       iconBg: 'bg-emerald-500/10',
       iconColor: 'text-emerald-500',
     },
     {
-      title: 'Won',
+      title: 'Выиграно',
       value: wonDeals.toString(),
-      subtitle: `${formatCurrency(totalRevenue)} revenue`,
+      subtitle: `${formatCurrency(totalRevenue)} выручка`,
       icon: Trophy,
       iconBg: 'bg-amber-500/10',
       iconColor: 'text-amber-500',
     },
     {
-      title: 'Conversion',
+      title: 'Конверсия',
       value: `${conversionRate}%`,
-      subtitle: `Won / Total`,
+      subtitle: 'Выиграно / Всего',
       icon: Target,
       iconBg: 'bg-violet-500/10',
       iconColor: 'text-violet-500',
@@ -244,7 +244,7 @@ export function DashboardPage() {
       <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-lg">
         <p className="font-medium text-foreground">{label}</p>
         <p className="text-muted-foreground">
-          {payload[0].value} deals
+          {payload[0].value} сделок
         </p>
       </div>
     )
@@ -317,7 +317,7 @@ export function DashboardPage() {
       <Card className="flex flex-col items-center justify-center py-16">
         <AlertCircle className="mb-4 h-10 w-10 text-destructive" />
         <h3 className="mb-1 text-lg font-semibold text-foreground">
-          Something went wrong
+          Что-то пошло не так
         </h3>
         <p className="mb-4 text-sm text-muted-foreground">{error}</p>
         <button
@@ -325,7 +325,7 @@ export function DashboardPage() {
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <TrendingUp className="h-4 w-4" />
-          Try again
+          Попробовать снова
         </button>
       </Card>
     )
@@ -370,7 +370,7 @@ export function DashboardPage() {
         {/* Bar Chart — Deals by Stage */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Deals by Stage</CardTitle>
+            <CardTitle className="text-base">Сделки по этапам</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[280px]">
@@ -409,7 +409,7 @@ export function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              Deal Status
+              Статус сделок
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -441,7 +441,7 @@ export function DashboardPage() {
                               {d.name}
                             </p>
                             <p className="text-muted-foreground">
-                              {d.value} deals
+                              {d.value} сделок
                             </p>
                           </div>
                         )
@@ -461,7 +461,7 @@ export function DashboardPage() {
                 </ResponsiveContainer>
               ) : (
                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                  No deal data
+                  Нет данных о сделках
                 </div>
               )}
             </div>
@@ -474,13 +474,13 @@ export function DashboardPage() {
         {/* Recent Deals */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Recent Deals</CardTitle>
+            <CardTitle className="text-base">Последние сделки</CardTitle>
           </CardHeader>
           <CardContent>
             <ScrollArea className="max-h-[340px]">
               {recentDeals.length === 0 ? (
                 <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
-                  No deals yet
+                  Сделок пока нет
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -522,20 +522,20 @@ export function DashboardPage() {
         {/* Activity Feed */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Activity Feed</CardTitle>
+            <CardTitle className="text-base">Лента активности</CardTitle>
           </CardHeader>
           <CardContent>
             <ScrollArea className="max-h-[340px]">
               {activities.length === 0 ? (
                 <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
-                  No activity
+                  Нет активности
                 </div>
               ) : (
                 <div className="space-y-1">
                   {activities.map((activity) => {
                     const Icon = getActivityIcon(activity.action)
                     const actorName =
-                      activity.users?.[0]?.name ?? 'Unknown'
+                      activity.users?.[0]?.name ?? 'Неизвестно'
                     return (
                       <div
                         key={activity.id}

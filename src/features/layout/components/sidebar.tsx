@@ -31,11 +31,11 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { view: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { view: 'deals', label: 'Deals', icon: Kanban },
-  { view: 'contacts', label: 'Contacts', icon: Users },
-  { view: 'tasks', label: 'Tasks', icon: CheckSquare },
-  { view: 'settings', label: 'Settings', icon: Settings },
+  { view: 'dashboard', label: 'Панель', icon: LayoutDashboard },
+  { view: 'deals', label: 'Сделки', icon: Kanban },
+  { view: 'contacts', label: 'Контакты', icon: Users },
+  { view: 'tasks', label: 'Задачи', icon: CheckSquare },
+  { view: 'settings', label: 'Настройки', icon: Settings },
 ]
 
 export function Sidebar() {
@@ -150,7 +150,7 @@ export function Sidebar() {
               </Avatar>
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={8}>
-              {currentUser?.name ?? 'User'}
+              {currentUser?.name ?? 'Пользователь'}
             </TooltipContent>
           </Tooltip>
         ) : (
@@ -162,7 +162,7 @@ export function Sidebar() {
             </Avatar>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-foreground">
-                {currentUser?.name ?? 'User'}
+                {currentUser?.name ?? 'Пользователь'}
               </p>
               <p className="truncate text-xs text-muted-foreground">
                 {currentUser?.email ?? ''}

@@ -95,7 +95,7 @@ export default function DealsPage() {
         }
       } catch (err: any) {
         if (cancelled) return
-        setError(err?.message || 'Failed to fetch data')
+        setError(err?.message || 'Не удалось загрузить данные')
       }
       setLoading(false)
     }
@@ -151,7 +151,7 @@ export default function DealsPage() {
       .eq('id', deal.id)
     if (!error) {
       await supabase.from('activities').insert({
-        action: `Moved "${deal.title}" to ${newStage.name}`,
+        action: `Перемещена сделка «${deal.title}» в ${newStage.name}`,
         entity_type: 'deal',
         entity_id: deal.id,
         user_id: currentUser?.id,
@@ -163,7 +163,7 @@ export default function DealsPage() {
   // ─── Delete Deal ──────────────────────────────────────────────────────────
 
   const deleteDeal = async (deal: any) => {
-    if (!window.confirm(`Delete "${deal.title}"? This action cannot be undone.`))
+    if (!window.confirm(`Удалить "${deal.title}"? Это действие нельзя отменить.`))
       return
     const { error } = await supabase
       .from('deals')
@@ -171,7 +171,7 @@ export default function DealsPage() {
       .eq('id', deal.id)
     if (!error) {
       await supabase.from('activities').insert({
-        action: `Deleted deal "${deal.title}"`,
+        action: `Удалена сделка «${deal.title}»`,
         entity_type: 'deal',
         entity_id: deal.id,
         user_id: currentUser?.id,
@@ -203,7 +203,7 @@ export default function DealsPage() {
     })
     if (!error) {
       await supabase.from('activities').insert({
-        action: `Created deal "${newTitle.trim()}"`,
+        action: `Создана сделка «${newTitle.trim()}»`,
         entity_type: 'deal',
         user_id: currentUser?.id,
       })
@@ -236,14 +236,15 @@ export default function DealsPage() {
         <div>
           <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
             <Package className="h-5 w-5 text-muted-foreground" />
-            Deal Pipeline
+            Воронка сделок
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {deals.length} deal{deals.length !== 1 ? 's' : ''} &middot;{' '}
+            {deals.length}{' '}
+            {deals.length === 1 ? 'сделка' : deals.length < 5 ? 'сделки' : 'сделок'} &middot;{' '}
             {formatCurrency(
               deals.reduce((sum: number, d: any) => sum + (d.value || 0), 0)
             )}{' '}
-            total
+            всего
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -259,13 +260,13 @@ export default function DealsPage() {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+                {f === 'all' ? 'Все' : f === 'open' ? 'Открытые' : f === 'won' ? 'Выигранные' : 'Проигранные'}
               </button>
             ))}
           </div>
           <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
             <Plus className="h-4 w-4" />
-            New Deal
+            Новая сделка
           </Button>
         </div>
       </div>
@@ -278,7 +279,7 @@ export default function DealsPage() {
           <AlertCircle className="h-10 w-10 text-destructive" />
           <p className="text-sm text-muted-foreground">{error}</p>
           <Button variant="outline" size="sm" onClick={fetchData}>
-            Retry
+            Повторить
           </Button>
         </div>
       )}
@@ -353,7 +354,7 @@ export default function DealsPage() {
                   <div className="space-y-2 pr-2">
                     {stageDeals.length === 0 && (
                       <div className="flex items-center justify-center h-24 text-xs text-muted-foreground rounded-lg border border-dashed">
-                        Empty
+                        Пусто
                       </div>
                     )}
                     {stageDeals.map((deal) => (
@@ -423,7 +424,7 @@ export default function DealsPage() {
                                     }}
                                   >
                                     <Trash2 className="h-3.5 w-3.5 mr-2" />
-                                    Delete
+                                    Удалить
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -446,18 +447,18 @@ export default function DealsPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus className="h-5 w-5" />
-              New Deal
+              Новая сделка
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             {/* Title */}
             <div className="space-y-2">
               <Label htmlFor="deal-title">
-                Title <span className="text-destructive">*</span>
+                Название <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="deal-title"
-                placeholder="e.g. Enterprise License"
+                placeholder="напр. Корпоративная лицензия"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 onKeyDown={(e) => {
@@ -468,7 +469,7 @@ export default function DealsPage() {
 
             {/* Value */}
             <div className="space-y-2">
-              <Label htmlFor="deal-value">Value (RUB)</Label>
+              <Label htmlFor="deal-value">Сумма (₽)</Label>
               <Input
                 id="deal-value"
                 type="number"
@@ -482,7 +483,7 @@ export default function DealsPage() {
 
             {/* Client */}
             <div className="space-y-2">
-              <Label>Client</Label>
+              <Label>Клиент</Label>
               <Select
                 value={newClientId || '__none__'}
                 onValueChange={(v) =>
@@ -490,10 +491,10 @@ export default function DealsPage() {
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a client (optional)" />
+                  <SelectValue placeholder="Выберите клиента (необязательно)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">None</SelectItem>
+                  <SelectItem value="__none__">Нет</SelectItem>
                   {clients.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.company || c.name}
@@ -506,7 +507,7 @@ export default function DealsPage() {
             {/* Priority + Stage */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Priority</Label>
+                <Label>Приоритет</Label>
                 <Select
                   value={newPriority}
                   onValueChange={setNewPriority}
@@ -515,20 +516,20 @@ export default function DealsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Low">Low</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="High">High</SelectItem>
+                    <SelectItem value="Low">Низкий</SelectItem>
+                    <SelectItem value="Medium">Средний</SelectItem>
+                    <SelectItem value="High">Высокий</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Stage</Label>
+                <Label>Этап</Label>
                 <Select
                   value={newStageId || stages[0]?.id || ''}
                   onValueChange={setNewStageId}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select stage" />
+                    <SelectValue placeholder="Выберите этап" />
                   </SelectTrigger>
                   <SelectContent>
                     {stages.map((s) => (
@@ -547,13 +548,13 @@ export default function DealsPage() {
                 variant="outline"
                 onClick={() => setCreateOpen(false)}
               >
-                Cancel
+                Отмена
               </Button>
               <Button
                 onClick={handleCreateDeal}
                 disabled={!newTitle.trim() || creating}
               >
-                {creating ? 'Creating...' : 'Create Deal'}
+                {creating ? 'Создание...' : 'Создать сделку'}
               </Button>
             </div>
           </div>
