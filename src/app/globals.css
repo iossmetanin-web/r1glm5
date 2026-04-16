@@ -142,11 +142,14 @@
   button,
   a,
   [role="button"] {
+    touch-action: manipulation;
     transition: color 0.2s ease-in-out, background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, opacity 0.2s ease-in-out;
   }
   input,
   select,
   textarea {
+    touch-action: manipulation;
+    font-size: 16px;
     transition: color 0.2s ease-in-out, background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, opacity 0.2s ease-in-out;
   }
 }
