@@ -90,7 +90,7 @@ export function Sidebar() {
                 } ${
                   isActive
                     ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
                 }`}
               >
                 <Icon className="h-4 w-4 shrink-0" />

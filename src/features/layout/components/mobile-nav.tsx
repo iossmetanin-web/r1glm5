@@ -22,7 +22,7 @@ const mobileNavItems: MobileNavItem[] = [
   { view: 'deals', label: 'Сделки', icon: Kanban },
   { view: 'contacts', label: 'Контакты', icon: Users },
   { view: 'tasks', label: 'Задачи', icon: CheckSquare },
-  { view: 'settings', label: 'Ещё', icon: Settings },
+  { view: 'settings', label: 'Настройки', icon: Settings },
 ]
 
 export function MobileNav() {
