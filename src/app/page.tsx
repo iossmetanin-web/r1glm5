@@ -1,31 +1,31 @@
 'use client'
 
+import { AppShell } from '@/features/layout/components/app-shell'
+import { useNavigationStore } from '@/lib/store'
+import { DashboardPage } from '@/features/dashboard/components/dashboard-page'
+import DealsPage from '@/features/deals/components/deals-page'
+import ContactsPage from '@/features/contacts/components/contacts-page'
+import TasksPage from '@/features/tasks/components/tasks-page'
+
 export default function Home() {
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100vh',
-      gap: '2rem',
-      padding: '1rem'
-    }}>
-      <div style={{
-        position: 'relative',
-        width: '6rem',
-        height: '6rem'
-      }}>
-        <img
-          src="/logo.svg"
-          alt="Z.ai Logo"
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain'
-          }}
-        />
+  const currentView = useNavigationStore((s) => s.currentView)
+
+  const views: Record<string, React.ReactNode> = {
+    dashboard: <DashboardPage />,
+    deals: <DealsPage />,
+    contacts: <ContactsPage />,
+    tasks: <TasksPage />,
+    settings: (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold">Settings</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Application settings will be available here.
+          </p>
+        </div>
       </div>
-    </div>
-  )
+    ),
+  }
+
+  return <AppShell>{views[currentView] || <DashboardPage />}</AppShell>
 }

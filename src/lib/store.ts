@@ -1,15 +1,10 @@
 import { create } from 'zustand'
-import { createClient } from '@/lib/supabase/client'
+import type { User } from '@/lib/supabase/database.types'
+import { supabase } from '@/lib/supabase/client'
 
-// ─── Navigation Store ────────────────────────────────────────────────────────
+// ─── Navigation ──────────────────────────────────────────────────────────────
 
-export type AppView =
-  | 'dashboard'
-  | 'deals'
-  | 'deal-detail'
-  | 'contacts'
-  | 'tasks'
-  | 'settings'
+export type AppView = 'dashboard' | 'deals' | 'deal-detail' | 'contacts' | 'tasks' | 'settings'
 
 interface NavigationState {
   currentView: AppView
@@ -24,26 +19,49 @@ export const useNavigationStore = create<NavigationState>((set) => ({
   currentView: 'dashboard',
   selectedDealId: null,
   previousView: null,
-  navigate: (view) =>
-    set((state) => ({
-      currentView: view,
-      selectedDealId: null,
-      previousView: state.currentView,
-    })),
-  openDeal: (dealId) =>
-    set((state) => ({
-      currentView: 'deal-detail',
-      selectedDealId: dealId,
-      previousView: state.currentView,
-    })),
-  goBack: () =>
-    set((state) => ({
-      currentView: state.previousView || 'dashboard',
-      selectedDealId: null,
-    })),
+  navigate: (view) => set((s) => ({ currentView: view, selectedDealId: null, previousView: s.currentView })),
+  openDeal: (dealId) => set((s) => ({ currentView: 'deal-detail', selectedDealId: dealId, previousView: s.currentView })),
+  goBack: () => set((s) => ({ currentView: s.previousView || 'dashboard', selectedDealId: null })),
 }))
 
-// ─── UI Store ────────────────────────────────────────────────────────────────
+// ─── Auth (simple — custom users table) ──────────────────────────────────────
+
+interface AuthState {
+  currentUser: User | null
+  loading: boolean
+  login: (user: User) => void
+  logout: () => void
+  setLoading: (l: boolean) => void
+}
+
+export const useAuthStore = create<AuthState>((set) => ({
+  currentUser: null,
+  loading: true,
+  login: (user) => {
+    if (typeof window !== 'undefined') localStorage.setItem('crm_user_id', user.id)
+    set({ currentUser: user })
+  },
+  logout: () => {
+    if (typeof window !== 'undefined') localStorage.removeItem('crm_user_id')
+    set({ currentUser: null })
+  },
+  setLoading: (loading) => set({ loading }),
+}))
+
+// Restore session from localStorage on load
+if (typeof window !== 'undefined') {
+  const savedId = localStorage.getItem('crm_user_id')
+  if (savedId) {
+    supabase.from('users').select('*').eq('id', savedId).single().then(({ data }) => {
+      if (data) useAuthStore.getState().login(data)
+      useAuthStore.getState().setLoading(false)
+    }).catch(() => useAuthStore.getState().setLoading(false))
+  } else {
+    useAuthStore.getState().setLoading(false)
+  }
+}
+
+// ─── UI ──────────────────────────────────────────────────────────────────────
 
 interface UIState {
   sidebarCollapsed: boolean
@@ -53,15 +71,6 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
   sidebarCollapsed: false,
-  toggleSidebar: () =>
-    set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+  toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
 }))
-
-// ─── Supabase Auth helper ────────────────────────────────────────────────────
-
-export async function signOut() {
-  const supabase = createClient()
-  await supabase.auth.signOut()
-  window.location.href = '/auth'
-}

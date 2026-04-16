@@ -1,57 +1,35 @@
 'use client'
 
-import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase/client'
+import { useAuthStore } from '@/lib/store'
+import type { User } from '@/lib/supabase/database.types'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Zap, Loader2 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 
 export function LoginForm() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const router = useRouter()
-  const supabase = createClient()
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const login = useAuthStore((s) => s.login)
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
+  useEffect(() => {
+    supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        setUsers(data ?? [])
+        setLoading(false)
+      })
+  }, [])
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-      return
-    }
-
-    router.push('/')
-    router.refresh()
-  }
-
-  const handleMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    setMessage(null)
-
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    })
-
-    if (error) {
-      setError(error.message)
-    } else {
-      setMessage('Check your email for the magic link')
-    }
-    setLoading(false)
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -62,76 +40,35 @@ export function LoginForm() {
             <Zap className="h-6 w-6 text-primary-foreground" />
           </div>
           <CardTitle className="text-xl font-semibold tracking-tight">
-            Welcome to PulseCRM
+            PulseCRM
           </CardTitle>
           <CardDescription className="text-sm text-muted-foreground">
-            Sign in to manage your sales pipeline
+            Выберите пользователя для входа
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-2">
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">
-                Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="h-10"
-                autoComplete="email"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">
-                Password
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="h-10"
-                autoComplete="current-password"
-              />
-            </div>
-
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
-            {message && (
-              <p className="text-sm text-emerald-500">{message}</p>
-            )}
-
-            <Button type="submit" className="w-full h-10" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sign in
-            </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">or</span>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-10"
-              onClick={handleMagicLink}
-              disabled={loading || !email}
-            >
-              Send magic link
-            </Button>
-          </form>
+          <div className="space-y-2">
+            {users.map((user) => (
+              <button
+                key={user.id}
+                onClick={() => login(user)}
+                className="flex w-full items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 text-left transition-all hover:bg-accent hover:border-accent-foreground/20"
+              >
+                <Avatar className="h-9 w-9">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-medium">
+                    {user.name.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{user.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                </div>
+                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 px-1.5 py-0.5 rounded bg-muted">
+                  {user.role}
+                </span>
+              </button>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>
