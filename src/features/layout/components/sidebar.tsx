@@ -57,7 +57,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border bg-card transition-all duration-300 ${
+      className={`hidden md:flex fixed inset-y-0 left-0 z-40 flex-col border-r border-border bg-card transition-all duration-300 ${
         sidebarCollapsed ? 'w-16' : 'w-60'
       }`}
     >

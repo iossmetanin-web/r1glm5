@@ -6,6 +6,7 @@ import { useAuthStore, useUIStore, restoreSession } from '@/lib/store'
 import { LoginForm } from '@/features/auth/components/login-form'
 import { Sidebar } from './sidebar'
 import { Header } from './header'
+import { MobileNav } from './mobile-nav'
 
 interface AppShellProps {
   children: React.ReactNode
@@ -48,15 +49,28 @@ export function AppShell({ children }: AppShellProps) {
   // Authenticated — render shell
   return (
     <div className="min-h-screen bg-background">
+      {/* Sidebar: hidden on mobile (md:block), visible on desktop */}
       <Sidebar />
+
+      {/* Main content area */}
       <div
-        className={`flex min-h-screen flex-col transition-[margin-left] duration-300 ${
-          sidebarCollapsed ? 'ml-16' : 'ml-60'
+        className={`flex min-h-screen flex-col transition-[margin-left] duration-300 md:ml-0 ${
+          sidebarCollapsed ? 'md:ml-16' : 'md:ml-60'
         }`}
       >
-        <Header />
-        <main className="flex-1 p-6">{children}</main>
+        {/* Header: hidden on mobile (md:flex), visible on desktop */}
+        <div className="hidden md:block">
+          <Header />
+        </div>
+
+        {/* Page content: extra bottom padding on mobile for nav bar */}
+        <main className="flex-1 p-4 pb-24 md:p-6 md:pb-6">
+          {children}
+        </main>
       </div>
+
+      {/* Bottom navigation: visible only on mobile */}
+      <MobileNav />
     </div>
   )
 }

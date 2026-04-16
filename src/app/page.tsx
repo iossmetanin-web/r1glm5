@@ -7,9 +7,9 @@ import { DashboardPage } from '@/features/dashboard/components/dashboard-page'
 import DealsPage from '@/features/deals/components/deals-page'
 import ContactsPage from '@/features/contacts/components/contacts-page'
 import TasksPage from '@/features/tasks/components/tasks-page'
+import { SettingsPage } from '@/features/settings/components/settings-page'
 
 // SSR-safe mounted detection using useSyncExternalStore
-// Returns false during SSR/static generation, true on client
 const emptySubscribe = () => () => {}
 function useIsMounted() {
   return useSyncExternalStore(
@@ -27,16 +27,7 @@ function AppContent() {
     deals: <DealsPage />,
     contacts: <ContactsPage />,
     tasks: <TasksPage />,
-    settings: (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-lg font-semibold">Настройки</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Настройки приложения будут доступны здесь.
-          </p>
-        </div>
-      </div>
-    ),
+    settings: <SettingsPage />,
   }
 
   return <AppShell>{views[currentView] || <DashboardPage />}</AppShell>
