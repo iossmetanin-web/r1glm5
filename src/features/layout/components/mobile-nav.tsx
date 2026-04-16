@@ -52,26 +52,26 @@ export function MobileNav() {
                 >
                   {/* Active pill background */}
                   <div
-                    className={`absolute inset-y-1 inset-x-1.5 rounded-xl transition-all duration-200 ease-in-out ${
+                    className={`absolute inset-y-1 inset-x-1.5 rounded-xl transition-opacity duration-200 ease-in-out ${
                       isActive
-                        ? `${item.tint} scale-100 opacity-100`
-                        : 'scale-90 opacity-0'
+                        ? `${item.tint} opacity-100`
+                        : 'opacity-0'
                     }`}
                   />
                   {/* Content */}
                   <div className="relative flex flex-col items-center gap-0.5">
-                    {/* Colored circle when active */}
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 ease-in-out ${
-                      isActive ? `${item.color} shadow-sm scale-105` : ''
+                    {/* Icon — same size always, colored */}
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors duration-200 ease-in-out ${
+                      isActive ? `${item.color} shadow-sm` : ''
                     }`}>
                       <Icon
-                        className={`h-5 w-5 transition-all duration-200 ease-in-out ${
+                        className={`h-6 w-6 transition-colors duration-200 ease-in-out ${
                           isActive ? 'text-white' : item.iconColor
                         }`}
                       />
                     </div>
                     <span
-                      className={`text-[11px] font-medium leading-none transition-all duration-200 ease-in-out ${
+                      className={`text-[11px] font-medium leading-none transition-colors duration-200 ease-in-out ${
                         isActive ? item.text : 'text-muted-foreground'
                       }`}
                     >
