@@ -8,6 +8,11 @@
 const XLSX = require('xlsx');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+
+function generateUUID() {
+  return crypto.randomUUID();
+}
 
 // ============================================================
 // 1. CONFIG
@@ -310,7 +315,7 @@ function detectSource(comments) {
 // 3. PARSE ALL FILES
 // ============================================================
 
-const allCompanies = []; // {name, inn, city, website, phone, email, source, status, manager, next_contact_date, notes, contacts:[]}
+const allCompanies = []; // {uuid, name, inn, city, ...}
 const allProposals = []; // {company_name, inn, items:[], date}
 const seenINN = new Set();
 const seenNames = new Set();
@@ -327,6 +332,8 @@ function addCompany(data) {
   if (normalizedName && seenNames.has(normalizedName)) return;
   if (normalizedName) seenNames.add(normalizedName);
   
+  // Assign a stable UUID now so we can reference it later
+  data.uuid = generateUUID();
   allCompanies.push(data);
 }
 
@@ -715,9 +722,7 @@ function generateSQL() {
   
   sql += `CREATE INDEX IF NOT EXISTS idx_contacts_company ON company_contacts(company_id);\n\n`;
   
-  // Activities table already exists with old schema — drop and recreate
-  sql += `-- ── 3. ACTIVITIES (recreate with new CRM schema) ────────────────\n`;
-  sql += `DROP TABLE IF EXISTS activities CASCADE;\n`;
+  sql += `-- ── 3. ACTIVITIES ─────────────────────────────────────────────\n`;
   sql += `CREATE TABLE activities (\n`;
   sql += `  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`;
   sql += `  company_id UUID REFERENCES companies(id) ON DELETE SET NULL,\n`;
@@ -776,15 +781,14 @@ function generateSQL() {
   sql += `DROP TRIGGER IF EXISTS proposals_updated_at ON proposals;\n`;
   sql += `CREATE TRIGGER proposals_updated_at BEFORE UPDATE ON proposals FOR EACH ROW EXECUTE FUNCTION update_updated_at();\n\n`;
   
-  // ---- RLS (disable for import, will re-enable after) ----
-  sql += `-- ── 7. DISABLE RLS FOR IMPORT ─────────────────────────────────\n`;
+  // ---- RLS ----
+  sql += `-- ── 7. RLS POLICIES ───────────────────────────────────────────\n`;
   sql += `ALTER TABLE companies ENABLE ROW LEVEL SECURITY;\n`;
   sql += `ALTER TABLE company_contacts ENABLE ROW LEVEL SECURITY;\n`;
   sql += `ALTER TABLE activities ENABLE ROW LEVEL SECURITY;\n`;
   sql += `ALTER TABLE proposals ENABLE ROW LEVEL SECURITY;\n`;
   sql += `ALTER TABLE proposal_items ENABLE ROW LEVEL SECURITY;\n\n`;
   
-  // Drop existing policies if they exist, then create permissive ones
   sql += `DO $$ BEGIN\n`;
   const rlsTables = ['companies', 'company_contacts', 'activities', 'proposals', 'proposal_items'];
   for (const t of rlsTables) {
@@ -795,42 +799,36 @@ function generateSQL() {
   }
   sql += `EXCEPTION WHEN OTHERS THEN NULL;\nEND $$;\n\n`;
   
-  // Service role bypasses RLS, so we just need basic policies for the app
-  sql += `-- Allow authenticated users full access (permissive policies)\n`;
   sql += `CREATE POLICY "companies_select" ON companies FOR SELECT USING (true);\n`;
   sql += `CREATE POLICY "companies_insert" ON companies FOR INSERT WITH CHECK (true);\n`;
   sql += `CREATE POLICY "companies_update" ON companies FOR UPDATE USING (true);\n`;
   sql += `CREATE POLICY "companies_delete" ON companies FOR DELETE USING (true);\n\n`;
-  
   sql += `CREATE POLICY "contacts_select" ON company_contacts FOR SELECT USING (true);\n`;
   sql += `CREATE POLICY "contacts_insert" ON company_contacts FOR INSERT WITH CHECK (true);\n`;
   sql += `CREATE POLICY "contacts_update" ON company_contacts FOR UPDATE USING (true);\n`;
   sql += `CREATE POLICY "contacts_delete" ON company_contacts FOR DELETE USING (true);\n\n`;
-  
   sql += `CREATE POLICY "activities_select" ON activities FOR SELECT USING (true);\n`;
   sql += `CREATE POLICY "activities_insert" ON activities FOR INSERT WITH CHECK (true);\n\n`;
-  
   sql += `CREATE POLICY "proposals_select" ON proposals FOR SELECT USING (true);\n`;
   sql += `CREATE POLICY "proposals_insert" ON proposals FOR INSERT WITH CHECK (true);\n`;
   sql += `CREATE POLICY "proposals_update" ON proposals FOR UPDATE USING (true);\n`;
   sql += `CREATE POLICY "proposals_delete" ON proposals FOR DELETE USING (true);\n\n`;
-  
   sql += `CREATE POLICY "proposal_items_select" ON proposal_items FOR SELECT USING (true);\n`;
   sql += `CREATE POLICY "proposal_items_insert" ON proposal_items FOR INSERT WITH CHECK (true);\n`;
   sql += `CREATE POLICY "proposal_items_update" ON proposal_items FOR UPDATE USING (true);\n`;
   sql += `CREATE POLICY "proposal_items_delete" ON proposal_items FOR DELETE USING (true);\n\n`;
-  
-  // ---- INSERT COMPANIES ----
+
+  // ---- INSERT COMPANIES (with explicit UUIDs) ----
   sql += `-- ================================================================\n`;
   sql += `-- INSERT COMPANIES (${allCompanies.length} records)\n`;
   sql += `-- ================================================================\n\n`;
   
   for (let i = 0; i < allCompanies.length; i++) {
     const c = allCompanies[i];
-    const alias = `c${i}`;
     
     sql += `-- Company: ${c.name || '(no name)'}${c.inn ? ' (ИНН: ' + c.inn + ')' : ''} | Manager: ${c.manager}\n`;
-    sql += `INSERT INTO companies (name, inn, city, website, contact_phone, contact_email, source, status, manager_name, next_contact_date, notes) VALUES (\n`;
+    sql += `INSERT INTO companies (id, name, inn, city, website, contact_phone, contact_email, source, status, manager_name, next_contact_date, notes) VALUES (\n`;
+    sql += `  '${c.uuid}',\n`;
     sql += `  ${escapeSql(c.name || '(без названия)')},\n`;
     sql += `  ${escapeSqlOrNull(c.inn)},\n`;
     sql += `  ${escapeSqlOrNull(c.city)},\n`;
@@ -845,12 +843,12 @@ function generateSQL() {
     sql += `);\n\n`;
   }
   
-  // ---- INSERT CONTACTS (ЛПР) ----
-  let totalContacts = 0;
+  // ---- INSERT CONTACTS (ЛПР) using pre-assigned company UUIDs ----
   sql += `-- ================================================================\n`;
   sql += `-- INSERT COMPANY CONTACTS (ЛПР)\n`;
   sql += `-- ================================================================\n\n`;
   
+  let totalContacts = 0;
   for (let i = 0; i < allCompanies.length; i++) {
     const c = allCompanies[i];
     if (!c.contacts || c.contacts.length === 0) continue;
@@ -861,7 +859,7 @@ function generateSQL() {
       
       totalContacts++;
       sql += `INSERT INTO company_contacts (company_id, name, position, phone, email, is_primary) VALUES (\n`;
-      sql += `  (SELECT id FROM companies WHERE inn ${c.inn ? '= ' + escapeSql(c.inn) : 'IS NULL'} AND name = ${escapeSql(c.name || '(без названия)')} LIMIT 1),\n`;
+      sql += `  '${c.uuid}',\n`;  // Direct UUID reference — no subquery!
       sql += `  ${escapeSql(contact.name || '')},\n`;
       sql += `  ${escapeSqlOrNull(contact.position)},\n`;
       sql += `  ${escapeSqlOrNull(contact.phone)},\n`;
@@ -871,7 +869,7 @@ function generateSQL() {
     }
   }
   
-  // ---- INSERT ACTIVITIES (from comments) ----
+  // ---- INSERT ACTIVITIES using pre-assigned company UUIDs ----
   sql += `-- ================================================================\n`;
   sql += `-- INSERT ACTIVITIES (from comments/notes)\n`;
   sql += `-- ================================================================\n\n`;
@@ -880,7 +878,6 @@ function generateSQL() {
     const c = allCompanies[i];
     if (!c.notes || c.notes.length < 3) continue;
     
-    // Determine activity type based on content
     let type = 'звонок';
     const lower = c.notes.toLowerCase();
     if (lower.includes('кп') || lower.includes('коммерческое') || lower.includes('предложение')) type = 'кп_отправлено';
@@ -891,15 +888,23 @@ function generateSQL() {
     else type = 'заметка';
     
     sql += `INSERT INTO activities (company_id, type, content, created_at) VALUES (\n`;
-    sql += `  (SELECT id FROM companies WHERE inn ${c.inn ? '= ' + escapeSql(c.inn) : 'IS NULL'} AND name = ${escapeSql(c.name || '(без названия)')} LIMIT 1),\n`;
+    sql += `  '${c.uuid}',\n`;  // Direct UUID reference!
     sql += `  ${escapeSql(type)},\n`;
     sql += `  ${escapeSql(c.notes)},\n`;
     sql += `  now()\n`;
     sql += `);\n\n`;
   }
   
-  // ---- INSERT PROPOSALS (КП from рам2 Sheet3) ----
-  // Uses DO blocks to reliably find/create company before inserting proposal
+  // ---- INSERT PROPOSALS using pre-assigned company UUIDs ----
+  // Build a lookup: proposal -> company UUID
+  const companyByINN = new Map();
+  const companyByName = new Map();
+  for (const c of allCompanies) {
+    if (c.inn) companyByINN.set(c.inn, c);
+    const n = c.name.toLowerCase().replace(/['"«»\s,.\-()]/g, '');
+    if (n) companyByName.set(n, c);
+  }
+  
   if (allProposals.length > 0) {
     sql += `-- ================================================================\n`;
     sql += `-- INSERT PROPOSALS (КП — коммерческие предложения)\n`;
@@ -909,65 +914,64 @@ function generateSQL() {
       const p = allProposals[i];
       const totalAmount = p.items.reduce((sum, item) => sum + item.total_price, 0);
       const proposalNum = 'КП-' + String(i + 1).padStart(3, '0');
-      const companyName = (p.company_name || '(без названия)').replace(/\s+/g, ' ').trim();
       
-      // Normalize company name for ILIKE search (remove quotes)
-      const normalizedForLike = companyName.replace(/['"«»]/g, '');
+      // Find matching company by UUID (guaranteed match since we control both sides)
+      let companyUUID = null;
       
-      sql += `-- Proposal ${proposalNum} for: ${companyName}\n`;
-      sql += `DO $$\n`;
-      sql += `DECLARE\n`;
-      sql += `  v_company_id UUID;\n`;
-      sql += `  v_proposal_id UUID;\n`;
-      sql += `BEGIN\n`;
-      // Step 1: Find company by INN first
-      if (p.inn) {
-        sql += `  SELECT id INTO v_company_id FROM companies WHERE inn = ${escapeSql(p.inn)} LIMIT 1;\n`;
+      // Try INN first
+      if (p.inn && companyByINN.has(p.inn)) {
+        companyUUID = companyByINN.get(p.inn).uuid;
       }
-      // Step 2: If not found, try by name (exact)
-      sql += `  IF v_company_id IS NULL THEN\n`;
-      sql += `    SELECT id INTO v_company_id FROM companies WHERE name = ${escapeSql(companyName)} LIMIT 1;\n`;
-      sql += `  END IF;\n`;
-      // Step 3: If not found, try ILIKE (fuzzy)
-      sql += `  IF v_company_id IS NULL THEN\n`;
-      sql += `    SELECT id INTO v_company_id FROM companies WHERE name ILIKE ${escapeSql('%' + normalizedForLike + '%')} LIMIT 1;\n`;
-      sql += `  END IF;\n`;
-      // Step 4: If still not found, create the company
-      sql += `  IF v_company_id IS NULL THEN\n`;
-      sql += `    INSERT INTO companies (name, inn, city, source, status, manager_name) VALUES (\n`;
-      sql += `      ${escapeSql(companyName)},\n`;
-      sql += `      ${escapeSqlOrNull(p.inn)},\n`;
-      sql += `      ${escapeSqlOrNull(p.city)},\n`;
-      sql += `      'входящая заявка',\n`;
-      sql += `      'сделал запрос',\n`;
-      sql += `      ${escapeSql(p.manager)}\n`;
-      sql += `    ) RETURNING id INTO v_company_id;\n`;
-      sql += `  END IF;\n`;
-      // Step 5: Insert the proposal
-      sql += `  INSERT INTO proposals (company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (\n`;
-      sql += `    v_company_id,\n`;
-      sql += `    ${escapeSql(p.manager)},\n`;
-      sql += `    ${escapeSql(proposalNum)},\n`;
-      sql += `    'отправлено',\n`;
-      sql += `    ${totalAmount},\n`;
-      sql += `    ${p.answer_date ? "'" + p.answer_date + "'" : 'NULL'},\n`;
-      sql += `    ${escapeSql('Запрос от ' + (p.query_date || 'неизвестно'))},\n`;
-      sql += `    ${p.query_date ? "'" + p.query_date + "'" : 'now()'}\n`;
-      sql += `  ) RETURNING id INTO v_proposal_id;\n`;
       
-      // Step 6: Insert proposal items
+      // Try by normalized name
+      if (!companyUUID && p.company_name) {
+        const n = p.company_name.toLowerCase().replace(/['"«»\s,.\-()]/g, '');
+        if (companyByName.has(n)) {
+          companyUUID = companyByName.get(n).uuid;
+        }
+      }
+      
+      // Fuzzy match: try partial name
+      if (!companyUUID && p.company_name) {
+        const n = p.company_name.toLowerCase().replace(/['"«»\s,.\-()]/g, '');
+        for (const [key, company] of companyByName) {
+          if (key.includes(n) || n.includes(key)) {
+            companyUUID = company.uuid;
+            break;
+          }
+        }
+      }
+      
+      if (!companyUUID) {
+        console.log(`WARNING: Could not find company for proposal ${proposalNum}: "${p.company_name}" (ИНН: ${p.inn})`);
+        continue; // Skip this proposal
+      }
+      
+      const proposalUUID = generateUUID();
+      
+      sql += `-- Proposal ${proposalNum} for: ${p.company_name} (company_id: ${companyUUID})\n`;
+      sql += `INSERT INTO proposals (id, company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (\n`;
+      sql += `  '${proposalUUID}',\n`;
+      sql += `  '${companyUUID}',\n`;  // Direct UUID — guaranteed to exist!
+      sql += `  ${escapeSql(p.manager)},\n`;
+      sql += `  ${escapeSql(proposalNum)},\n`;
+      sql += `  'отправлено',\n`;
+      sql += `  ${totalAmount},\n`;
+      sql += `  ${p.answer_date ? "'" + p.answer_date + "'" : 'NULL'},\n`;
+      sql += `  ${escapeSql('Запрос от ' + (p.query_date || 'неизвестно'))},\n`;
+      sql += `  ${p.query_date ? "'" + p.query_date + "'" : 'now()'}\n`;
+      sql += `);\n\n`;
+      
       for (const item of p.items) {
-        sql += `  INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (\n`;
-        sql += `    v_proposal_id,\n`;
-        sql += `    ${escapeSql(item.product_name)},\n`;
-        sql += `    ${item.quantity},\n`;
-        sql += `    'шт.',\n`;
-        sql += `    ${item.price_per_unit},\n`;
-        sql += `    ${item.total_price}\n`;
-        sql += `  );\n`;
+        sql += `INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (\n`;
+        sql += `  '${proposalUUID}',\n`;
+        sql += `  ${escapeSql(item.product_name)},\n`;
+        sql += `  ${item.quantity},\n`;
+        sql += `  'шт.',\n`;
+        sql += `  ${item.price_per_unit},\n`;
+        sql += `  ${item.total_price}\n`;
+        sql += `);\n\n`;
       }
-      
-      sql += `END $$;\n\n`;
     }
   }
   
