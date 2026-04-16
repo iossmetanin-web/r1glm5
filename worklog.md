@@ -133,3 +133,35 @@ Stage Summary:
 - Auth logic, Supabase integration, routing — completely unchanged
 - 2 files modified: globals.css (5 keyframes) + login-form.tsx (visual layer only)
 - Russian language preserved
+
+---
+Task ID: 6
+Agent: main
+Task: Fix critical auth bug — eliminate ALL traces of old fake user picker system
+
+Work Log:
+- Searched entire codebase: confirmed zero user picker code exists in any .tsx file
+- Identified root causes of phantom user picker:
+  1. `crm_user_id` in localStorage from old system (ghost data)
+  2. `_restoreStarted` module-level flag in store.ts (gets stuck after HMR)
+  3. `login()` and `logout()` still writing/reading `crm_user_id`
+  4. `.next` build cache serving stale compiled code
+- Rewrote `src/lib/store.ts`:
+  - Removed ALL `localStorage.setItem/getItem/removeItem('crm_user_id')` — completely gone
+  - Removed `_restoreStarted` module-level guard (was blocking restoreSession after HMR)
+  - `restoreSession()` now idempotent — safe to call multiple times
+  - `logout()` is now `async` — awaits `supabase.auth.signOut()` (not fire-and-forget)
+  - Only auth source: `supabase.auth.getSession()`
+- Updated `src/app/page.tsx`:
+  - Added `useRef(false)` guard for restoreSession (survives HMR properly)
+  - Auth flow: `useRef` guard → `restoreSession()` → Supabase `getSession()` → login or show LoginForm
+- Verified: `grep crm_user_id src/` returns ZERO matches — old system fully purged
+- Nuked `.next` cache, fresh compilation: GET / 200 OK
+- Ran lint: 0 errors
+
+Stage Summary:
+- Old fake auth system (user picker, crm_user_id, localStorage hacks) completely eliminated
+- Auth is now 100% Supabase Auth — no fallbacks, no fake users, no localStorage
+- `restoreSession()` idempotent + ref-guarded = safe against HMR
+- `logout()` properly awaits Supabase signOut before state clears
+- `.next` cache nuked, fresh build confirmed working

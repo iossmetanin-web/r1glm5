@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useSyncExternalStore } from 'react'
 import { AppShell } from '@/features/layout/components/app-shell'
 import { MobileNav } from '@/features/layout/components/mobile-nav'
@@ -28,9 +28,12 @@ function AppContent() {
   const loading = useAuthStore((s) => s.loading)
   const hydrated = useAuthStore((s) => s.hydrated)
   const currentView = useNavigationStore((s) => s.currentView)
+  const restoreRef = useRef(false)
 
-  // Restore Supabase Auth session — runs once in browser
+  // Restore Supabase Auth session — runs once, guarded by ref (safe against HMR)
   useEffect(() => {
+    if (restoreRef.current) return
+    restoreRef.current = true
     restoreSession()
   }, [])
 

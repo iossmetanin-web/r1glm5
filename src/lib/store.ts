@@ -23,14 +23,14 @@ export const useNavigationStore = create<NavigationState>((set) => ({
   goBack: () => set((s) => ({ currentView: s.previousView || 'dashboard', selectedDealId: null })),
 }))
 
-// ─── Auth (Supabase Auth + CRM users table) ──────────────────────────────────
+// ─── Auth (Supabase Auth only — NO fake users, NO localStorage hacks) ─────
 
 interface AuthState {
   currentUser: User | null
   loading: boolean
   hydrated: boolean
   login: (user: User) => void
-  logout: () => void
+  logout: () => Promise<void>
   setLoading: (l: boolean) => void
   setHydrated: () => void
 }
@@ -40,33 +40,24 @@ export const useAuthStore = create<AuthState>((set) => ({
   loading: true,
   hydrated: false,
   login: (user) => {
-    if (typeof window !== 'undefined') {
-      try { localStorage.setItem('crm_user_id', user.id) } catch { /* ignore */ }
-    }
     set({ currentUser: user })
   },
-  logout: () => {
-    if (typeof window !== 'undefined') {
-      try { localStorage.removeItem('crm_user_id') } catch { /* ignore */ }
-    }
+  logout: async () => {
+    // 1. Clear Zustand state immediately
     set({ currentUser: null })
-    // Sign out from Supabase Auth (fire-and-forget)
-    import('@/lib/supabase/client').then(({ supabase }) => {
-      supabase.auth.signOut().catch(() => {})
-    })
+    // 2. Sign out from Supabase Auth (clears refresh token)
+    try {
+      const { supabase } = await import('@/lib/supabase/client')
+      await supabase.auth.signOut()
+    } catch { /* ignore */ }
   },
   setLoading: (loading) => set({ loading }),
   setHydrated: () => set({ hydrated: true }),
 }))
 
-// ─── Session restore (called from client components only via useEffect) ──────
-
-let _restoreStarted = false
+// ─── Session restore — ONLY uses Supabase Auth.getSession() ─────────────────
 
 export async function restoreSession() {
-  if (_restoreStarted) return
-  _restoreStarted = true
-
   // Only runs in browser, never during SSR
   if (typeof window === 'undefined') {
     useAuthStore.getState().setLoading(false)
@@ -75,10 +66,9 @@ export async function restoreSession() {
   }
 
   try {
-    // Dynamic import to avoid SSR issues — Supabase client only loaded in browser
     const { supabase } = await import('@/lib/supabase/client')
 
-    // Check for active Supabase Auth session
+    // ONLY source of truth: Supabase Auth session
     const { data: { session } } = await supabase.auth.getSession()
 
     if (session?.user) {
@@ -113,6 +103,7 @@ export async function restoreSession() {
         }
       }
     }
+    // If no session → currentUser stays null → login page shows
   } catch {
     // Session restore failed — user will see login page
   } finally {
