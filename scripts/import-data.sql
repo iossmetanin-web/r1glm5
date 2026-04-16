@@ -1,11 +1,21 @@
 -- ================================================================
 -- PulseCRM — Complete Database Setup + Data Import
--- Generated: 2026-04-16T23:15:28.372Z
+-- Generated: 2026-04-16T23:26:14.157Z
 -- Companies: 431 | Proposals: 5
 -- ================================================================
 
+-- ================================================================
+-- CLEAN IMPORT — drops and recreates all CRM tables
+-- ================================================================
+
+DROP TABLE IF EXISTS proposal_items CASCADE;
+DROP TABLE IF EXISTS proposals CASCADE;
+DROP TABLE IF EXISTS activities CASCADE;
+DROP TABLE IF EXISTS company_contacts CASCADE;
+DROP TABLE IF EXISTS companies CASCADE;
+
 -- ── 1. COMPANIES ─────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS companies (
+CREATE TABLE companies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   inn TEXT,
@@ -30,7 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_companies_status ON companies(status);
 CREATE INDEX IF NOT EXISTS idx_companies_next_contact ON companies(next_contact_date) WHERE next_contact_date IS NOT NULL;
 
 -- ── 2. COMPANY CONTACTS (ЛПР) ────────────────────────────────
-CREATE TABLE IF NOT EXISTS company_contacts (
+CREATE TABLE company_contacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   name TEXT NOT NULL DEFAULT '',
@@ -63,7 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_activities_user ON activities(user_id);
 CREATE INDEX IF NOT EXISTS idx_activities_date ON activities(created_at DESC);
 
 -- ── 4. PROPOSALS (КП) ────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS proposals (
+CREATE TABLE proposals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   manager_id UUID REFERENCES auth.users(id),
@@ -80,7 +90,7 @@ CREATE TABLE IF NOT EXISTS proposals (
 CREATE INDEX IF NOT EXISTS idx_proposals_company ON proposals(company_id);
 
 -- ── 5. PROPOSAL ITEMS ────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS proposal_items (
+CREATE TABLE proposal_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   proposal_id UUID NOT NULL REFERENCES proposals(id) ON DELETE CASCADE,
   product_name TEXT NOT NULL,
@@ -11233,132 +11243,244 @@ INSERT INTO activities (company_id, type, content, created_at) VALUES (
 -- INSERT PROPOSALS (КП — коммерческие предложения)
 -- ================================================================
 
-INSERT INTO proposals (company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (
-  (SELECT id FROM companies WHERE inn = '5032304480' AND name = 'ООО "НПО АР-ТЕХНОЛОГИИ"' LIMIT 1),
-  'Рам',
-  'КП-001',
-  'отправлено',
-  2952000,
-  '2025-09-02',
-  'Запрос от 2025-08-29',
-  '2025-08-29'
-);
+-- Proposal КП-001 for: ООО "НПО АР-ТЕХНОЛОГИИ"
+DO $$
+DECLARE
+  v_company_id UUID;
+  v_proposal_id UUID;
+BEGIN
+  SELECT id INTO v_company_id FROM companies WHERE inn = '5032304480' LIMIT 1;
+  IF v_company_id IS NULL THEN
+    SELECT id INTO v_company_id FROM companies WHERE name = 'ООО "НПО АР-ТЕХНОЛОГИИ"' LIMIT 1;
+  END IF;
+  IF v_company_id IS NULL THEN
+    SELECT id INTO v_company_id FROM companies WHERE name ILIKE '%ООО НПО АР-ТЕХНОЛОГИИ%' LIMIT 1;
+  END IF;
+  IF v_company_id IS NULL THEN
+    INSERT INTO companies (name, inn, city, source, status, manager_name) VALUES (
+      'ООО "НПО АР-ТЕХНОЛОГИИ"',
+      '5032304480',
+      'Москва',
+      'входящая заявка',
+      'сделал запрос',
+      'Рам'
+    ) RETURNING id INTO v_company_id;
+  END IF;
+  INSERT INTO proposals (company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (
+    v_company_id,
+    'Рам',
+    'КП-001',
+    'отправлено',
+    2952000,
+    '2025-09-02',
+    'Запрос от 2025-08-29',
+    '2025-08-29'
+  ) RETURNING id INTO v_proposal_id;
+  INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
+    v_proposal_id,
+    'ТСЛ 1250/20-10/0.4 Алюминь',
+    1,
+    'шт.',
+    1600000,
+    1600000
+  );
+  INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
+    v_proposal_id,
+    'ТСЛ 1250/10/0.4 алюминь',
+    1,
+    'шт.',
+    1352000,
+    1352000
+  );
+END $$;
 
-INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
-  (SELECT id FROM proposals WHERE number = 'КП-001' LIMIT 1),
-  'ТСЛ 1250/20-10/0.4 Алюминь',
-  1,
-  'шт.',
-  1600000,
-  1600000
-);
+-- Proposal КП-002 for: ООО "ЦРЗЭ"
+DO $$
+DECLARE
+  v_company_id UUID;
+  v_proposal_id UUID;
+BEGIN
+  SELECT id INTO v_company_id FROM companies WHERE inn = '6670227858' LIMIT 1;
+  IF v_company_id IS NULL THEN
+    SELECT id INTO v_company_id FROM companies WHERE name = 'ООО "ЦРЗЭ"' LIMIT 1;
+  END IF;
+  IF v_company_id IS NULL THEN
+    SELECT id INTO v_company_id FROM companies WHERE name ILIKE '%ООО ЦРЗЭ%' LIMIT 1;
+  END IF;
+  IF v_company_id IS NULL THEN
+    INSERT INTO companies (name, inn, city, source, status, manager_name) VALUES (
+      'ООО "ЦРЗЭ"',
+      '6670227858',
+      'Екатеринбург',
+      'входящая заявка',
+      'сделал запрос',
+      'Рам'
+    ) RETURNING id INTO v_company_id;
+  END IF;
+  INSERT INTO proposals (company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (
+    v_company_id,
+    'Рам',
+    'КП-002',
+    'отправлено',
+    4380000,
+    '2025-09-01',
+    'Запрос от 2025-08-29',
+    '2025-08-29'
+  ) RETURNING id INTO v_proposal_id;
+  INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
+    v_proposal_id,
+    'ТСЛ 1250/10/0.4 медь',
+    2,
+    'шт.',
+    2190000,
+    4380000
+  );
+END $$;
 
-INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
-  (SELECT id FROM proposals WHERE number = 'КП-001' LIMIT 1),
-  'ТСЛ 1250/10/0.4 алюминь',
-  1,
-  'шт.',
-  1352000,
-  1352000
-);
+-- Proposal КП-003 for: ООО "ПЭП"
+DO $$
+DECLARE
+  v_company_id UUID;
+  v_proposal_id UUID;
+BEGIN
+  SELECT id INTO v_company_id FROM companies WHERE inn = '7801454062' LIMIT 1;
+  IF v_company_id IS NULL THEN
+    SELECT id INTO v_company_id FROM companies WHERE name = 'ООО "ПЭП"' LIMIT 1;
+  END IF;
+  IF v_company_id IS NULL THEN
+    SELECT id INTO v_company_id FROM companies WHERE name ILIKE '%ООО ПЭП%' LIMIT 1;
+  END IF;
+  IF v_company_id IS NULL THEN
+    INSERT INTO companies (name, inn, city, source, status, manager_name) VALUES (
+      'ООО "ПЭП"',
+      '7801454062',
+      'Питер',
+      'входящая заявка',
+      'сделал запрос',
+      'Рам'
+    ) RETURNING id INTO v_company_id;
+  END IF;
+  INSERT INTO proposals (company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (
+    v_company_id,
+    'Рам',
+    'КП-003',
+    'отправлено',
+    0,
+    NULL,
+    'Запрос от 2025-09-11',
+    '2025-09-11'
+  ) RETURNING id INTO v_proposal_id;
+  INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
+    v_proposal_id,
+    'трднс 25 000',
+    1,
+    'шт.',
+    0,
+    0
+  );
+END $$;
 
-INSERT INTO proposals (company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (
-  (SELECT id FROM companies WHERE inn = '6670227858' AND name = 'ООО "ЦРЗЭ"' LIMIT 1),
-  'Рам',
-  'КП-002',
-  'отправлено',
-  4380000,
-  '2025-09-01',
-  'Запрос от 2025-08-29',
-  '2025-08-29'
-);
+-- Proposal КП-004 for: ООО "РиМтехЭнерго"
+DO $$
+DECLARE
+  v_company_id UUID;
+  v_proposal_id UUID;
+BEGIN
+  SELECT id INTO v_company_id FROM companies WHERE inn = '5402543239' LIMIT 1;
+  IF v_company_id IS NULL THEN
+    SELECT id INTO v_company_id FROM companies WHERE name = 'ООО "РиМтехЭнерго"' LIMIT 1;
+  END IF;
+  IF v_company_id IS NULL THEN
+    SELECT id INTO v_company_id FROM companies WHERE name ILIKE '%ООО РиМтехЭнерго%' LIMIT 1;
+  END IF;
+  IF v_company_id IS NULL THEN
+    INSERT INTO companies (name, inn, city, source, status, manager_name) VALUES (
+      'ООО "РиМтехЭнерго"',
+      '5402543239',
+      'Новосиб',
+      'входящая заявка',
+      'сделал запрос',
+      'Рам'
+    ) RETURNING id INTO v_company_id;
+  END IF;
+  INSERT INTO proposals (company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (
+    v_company_id,
+    'Рам',
+    'КП-004',
+    'отправлено',
+    0,
+    NULL,
+    'Запрос от 2025-09-30',
+    '2025-09-30'
+  ) RETURNING id INTO v_proposal_id;
+  INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
+    v_proposal_id,
+    '2ктп 3150 сухари',
+    1,
+    'шт.',
+    0,
+    0
+  );
+END $$;
 
-INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
-  (SELECT id FROM proposals WHERE number = 'КП-002' LIMIT 1),
-  'ТСЛ 1250/10/0.4 медь',
-  2,
-  'шт.',
-  2190000,
-  4380000
-);
-
-INSERT INTO proposals (company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (
-  (SELECT id FROM companies WHERE inn = '7801454062' AND name = 'ООО "ПЭП"' LIMIT 1),
-  'Рам',
-  'КП-003',
-  'отправлено',
-  0,
-  NULL,
-  'Запрос от 2025-09-11',
-  '2025-09-11'
-);
-
-INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
-  (SELECT id FROM proposals WHERE number = 'КП-003' LIMIT 1),
-  'трднс 25 000',
-  1,
-  'шт.',
-  0,
-  0
-);
-
-INSERT INTO proposals (company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (
-  (SELECT id FROM companies WHERE inn = '5402543239' AND name = 'ООО "РиМтехЭнерго"' LIMIT 1),
-  'Рам',
-  'КП-004',
-  'отправлено',
-  0,
-  NULL,
-  'Запрос от 2025-09-30',
-  '2025-09-30'
-);
-
-INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
-  (SELECT id FROM proposals WHERE number = 'КП-004' LIMIT 1),
-  '2ктп 3150 сухари',
-  1,
-  'шт.',
-  0,
-  0
-);
-
-INSERT INTO proposals (company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (
-  (SELECT id FROM companies WHERE inn = '6316213310' AND name = 'ООО "ПКФ "ТСК"' LIMIT 1),
-  'Рам',
-  'КП-005',
-  'отправлено',
-  0,
-  NULL,
-  'Запрос от неизвестно',
-  now()
-);
-
-INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
-  (SELECT id FROM proposals WHERE number = 'КП-005' LIMIT 1),
-  'Прошу дать цену на трансформаторы',
-  1,
-  'шт.',
-  0,
-  0
-);
-
-INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
-  (SELECT id FROM proposals WHERE number = 'КП-005' LIMIT 1),
-  '1. ТМГ-630 10/0,4 D/Yн  -  (S9-630 10/0,4 D/Yн)',
-  2,
-  'шт.',
-  0,
-  0
-);
-
-INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
-  (SELECT id FROM proposals WHERE number = 'КП-005' LIMIT 1),
-  '2. ТМГ-2500 10/0,4 D/Yн  -  (S9-2500 10/0,4 D/Yн)',
-  6,
-  'шт.',
-  0,
-  0
-);
+-- Proposal КП-005 for: ООО "ПКФ "ТСК"
+DO $$
+DECLARE
+  v_company_id UUID;
+  v_proposal_id UUID;
+BEGIN
+  SELECT id INTO v_company_id FROM companies WHERE inn = '6316213310' LIMIT 1;
+  IF v_company_id IS NULL THEN
+    SELECT id INTO v_company_id FROM companies WHERE name = 'ООО "ПКФ "ТСК"' LIMIT 1;
+  END IF;
+  IF v_company_id IS NULL THEN
+    SELECT id INTO v_company_id FROM companies WHERE name ILIKE '%ООО ПКФ ТСК%' LIMIT 1;
+  END IF;
+  IF v_company_id IS NULL THEN
+    INSERT INTO companies (name, inn, city, source, status, manager_name) VALUES (
+      'ООО "ПКФ "ТСК"',
+      '6316213310',
+      'Москва',
+      'входящая заявка',
+      'сделал запрос',
+      'Рам'
+    ) RETURNING id INTO v_company_id;
+  END IF;
+  INSERT INTO proposals (company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (
+    v_company_id,
+    'Рам',
+    'КП-005',
+    'отправлено',
+    0,
+    NULL,
+    'Запрос от неизвестно',
+    now()
+  ) RETURNING id INTO v_proposal_id;
+  INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
+    v_proposal_id,
+    'Прошу дать цену на трансформаторы',
+    1,
+    'шт.',
+    0,
+    0
+  );
+  INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
+    v_proposal_id,
+    '1. ТМГ-630 10/0,4 D/Yн  -  (S9-630 10/0,4 D/Yн)',
+    2,
+    'шт.',
+    0,
+    0
+  );
+  INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (
+    v_proposal_id,
+    '2. ТМГ-2500 10/0,4 D/Yн  -  (S9-2500 10/0,4 D/Yн)',
+    6,
+    'шт.',
+    0,
+    0
+  );
+END $$;
 
 -- ================================================================
 -- UPDATE PIPELINE STAGES (if table exists)

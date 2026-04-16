@@ -663,9 +663,19 @@ function generateSQL() {
   sql += `-- Companies: ${allCompanies.length} | Proposals: ${allProposals.length}\n`;
   sql += `-- ================================================================\n\n`;
   
+  // ---- DROP existing tables for clean re-import ----
+  sql += `-- ================================================================\n`;
+  sql += `-- CLEAN IMPORT — drops and recreates all CRM tables\n`;
+  sql += `-- ================================================================\n\n`;
+  sql += `DROP TABLE IF EXISTS proposal_items CASCADE;\n`;
+  sql += `DROP TABLE IF EXISTS proposals CASCADE;\n`;
+  sql += `DROP TABLE IF EXISTS activities CASCADE;\n`;
+  sql += `DROP TABLE IF EXISTS company_contacts CASCADE;\n`;
+  sql += `DROP TABLE IF EXISTS companies CASCADE;\n\n`;
+  
   // ---- CREATE TABLES ----
   sql += `-- ── 1. COMPANIES ─────────────────────────────────────────────\n`;
-  sql += `CREATE TABLE IF NOT EXISTS companies (\n`;
+  sql += `CREATE TABLE companies (\n`;
   sql += `  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`;
   sql += `  name TEXT NOT NULL,\n`;
   sql += `  inn TEXT,\n`;
@@ -690,7 +700,7 @@ function generateSQL() {
   sql += `CREATE INDEX IF NOT EXISTS idx_companies_next_contact ON companies(next_contact_date) WHERE next_contact_date IS NOT NULL;\n\n`;
   
   sql += `-- ── 2. COMPANY CONTACTS (ЛПР) ────────────────────────────────\n`;
-  sql += `CREATE TABLE IF NOT EXISTS company_contacts (\n`;
+  sql += `CREATE TABLE company_contacts (\n`;
   sql += `  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`;
   sql += `  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,\n`;
   sql += `  name TEXT NOT NULL DEFAULT '',\n`;
@@ -724,7 +734,7 @@ function generateSQL() {
   sql += `CREATE INDEX IF NOT EXISTS idx_activities_date ON activities(created_at DESC);\n\n`;
   
   sql += `-- ── 4. PROPOSALS (КП) ────────────────────────────────────────\n`;
-  sql += `CREATE TABLE IF NOT EXISTS proposals (\n`;
+  sql += `CREATE TABLE proposals (\n`;
   sql += `  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`;
   sql += `  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,\n`;
   sql += `  manager_id UUID REFERENCES auth.users(id),\n`;
@@ -741,7 +751,7 @@ function generateSQL() {
   sql += `CREATE INDEX IF NOT EXISTS idx_proposals_company ON proposals(company_id);\n\n`;
   
   sql += `-- ── 5. PROPOSAL ITEMS ────────────────────────────────────────\n`;
-  sql += `CREATE TABLE IF NOT EXISTS proposal_items (\n`;
+  sql += `CREATE TABLE proposal_items (\n`;
   sql += `  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`;
   sql += `  proposal_id UUID NOT NULL REFERENCES proposals(id) ON DELETE CASCADE,\n`;
   sql += `  product_name TEXT NOT NULL,\n`;
@@ -889,6 +899,7 @@ function generateSQL() {
   }
   
   // ---- INSERT PROPOSALS (КП from рам2 Sheet3) ----
+  // Uses DO blocks to reliably find/create company before inserting proposal
   if (allProposals.length > 0) {
     sql += `-- ================================================================\n`;
     sql += `-- INSERT PROPOSALS (КП — коммерческие предложения)\n`;
@@ -897,29 +908,66 @@ function generateSQL() {
     for (let i = 0; i < allProposals.length; i++) {
       const p = allProposals[i];
       const totalAmount = p.items.reduce((sum, item) => sum + item.total_price, 0);
+      const proposalNum = 'КП-' + String(i + 1).padStart(3, '0');
+      const companyName = (p.company_name || '(без названия)').replace(/\s+/g, ' ').trim();
       
-      sql += `INSERT INTO proposals (company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (\n`;
-      sql += `  (SELECT id FROM companies WHERE inn ${p.inn ? '= ' + escapeSql(p.inn) : 'IS NULL'} AND name = ${escapeSql(p.company_name || '(без названия)')} LIMIT 1),\n`;
-      sql += `  ${escapeSql(p.manager)},\n`;
-      sql += `  ${escapeSql('КП-' + String(i + 1).padStart(3, '0'))},\n`;
-      sql += `  'отправлено',\n`;
-      sql += `  ${totalAmount},\n`;
-      sql += `  ${p.answer_date ? "'" + p.answer_date + "'" : 'NULL'},\n`;
-      sql += `  ${escapeSql('Запрос от ' + (p.query_date || 'неизвестно'))},\n`;
-      sql += `  ${p.query_date ? "'" + p.query_date + "'" : 'now()'}\n`;
-      sql += `);\n\n`;
+      // Normalize company name for ILIKE search (remove quotes)
+      const normalizedForLike = companyName.replace(/['"«»]/g, '');
       
-      // Insert proposal items
-      for (const item of p.items) {
-        sql += `INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (\n`;
-        sql += `  (SELECT id FROM proposals WHERE number = ${escapeSql('КП-' + String(i + 1).padStart(3, '0'))} LIMIT 1),\n`;
-        sql += `  ${escapeSql(item.product_name)},\n`;
-        sql += `  ${item.quantity},\n`;
-        sql += `  'шт.',\n`;
-        sql += `  ${item.price_per_unit},\n`;
-        sql += `  ${item.total_price}\n`;
-        sql += `);\n\n`;
+      sql += `-- Proposal ${proposalNum} for: ${companyName}\n`;
+      sql += `DO $$\n`;
+      sql += `DECLARE\n`;
+      sql += `  v_company_id UUID;\n`;
+      sql += `  v_proposal_id UUID;\n`;
+      sql += `BEGIN\n`;
+      // Step 1: Find company by INN first
+      if (p.inn) {
+        sql += `  SELECT id INTO v_company_id FROM companies WHERE inn = ${escapeSql(p.inn)} LIMIT 1;\n`;
       }
+      // Step 2: If not found, try by name (exact)
+      sql += `  IF v_company_id IS NULL THEN\n`;
+      sql += `    SELECT id INTO v_company_id FROM companies WHERE name = ${escapeSql(companyName)} LIMIT 1;\n`;
+      sql += `  END IF;\n`;
+      // Step 3: If not found, try ILIKE (fuzzy)
+      sql += `  IF v_company_id IS NULL THEN\n`;
+      sql += `    SELECT id INTO v_company_id FROM companies WHERE name ILIKE ${escapeSql('%' + normalizedForLike + '%')} LIMIT 1;\n`;
+      sql += `  END IF;\n`;
+      // Step 4: If still not found, create the company
+      sql += `  IF v_company_id IS NULL THEN\n`;
+      sql += `    INSERT INTO companies (name, inn, city, source, status, manager_name) VALUES (\n`;
+      sql += `      ${escapeSql(companyName)},\n`;
+      sql += `      ${escapeSqlOrNull(p.inn)},\n`;
+      sql += `      ${escapeSqlOrNull(p.city)},\n`;
+      sql += `      'входящая заявка',\n`;
+      sql += `      'сделал запрос',\n`;
+      sql += `      ${escapeSql(p.manager)}\n`;
+      sql += `    ) RETURNING id INTO v_company_id;\n`;
+      sql += `  END IF;\n`;
+      // Step 5: Insert the proposal
+      sql += `  INSERT INTO proposals (company_id, manager_name, number, status, total_amount, valid_until, notes, created_at) VALUES (\n`;
+      sql += `    v_company_id,\n`;
+      sql += `    ${escapeSql(p.manager)},\n`;
+      sql += `    ${escapeSql(proposalNum)},\n`;
+      sql += `    'отправлено',\n`;
+      sql += `    ${totalAmount},\n`;
+      sql += `    ${p.answer_date ? "'" + p.answer_date + "'" : 'NULL'},\n`;
+      sql += `    ${escapeSql('Запрос от ' + (p.query_date || 'неизвестно'))},\n`;
+      sql += `    ${p.query_date ? "'" + p.query_date + "'" : 'now()'}\n`;
+      sql += `  ) RETURNING id INTO v_proposal_id;\n`;
+      
+      // Step 6: Insert proposal items
+      for (const item of p.items) {
+        sql += `  INSERT INTO proposal_items (proposal_id, product_name, quantity, unit, price_per_unit, total_price) VALUES (\n`;
+        sql += `    v_proposal_id,\n`;
+        sql += `    ${escapeSql(item.product_name)},\n`;
+        sql += `    ${item.quantity},\n`;
+        sql += `    'шт.',\n`;
+        sql += `    ${item.price_per_unit},\n`;
+        sql += `    ${item.total_price}\n`;
+        sql += `  );\n`;
+      }
+      
+      sql += `END $$;\n\n`;
     }
   }
   
