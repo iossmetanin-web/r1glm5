@@ -236,14 +236,14 @@ export default function DealsPage() {
         <div>
           <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
             <Package className="h-5 w-5 text-muted-foreground" />
-            Deals Pipeline
+            Воронка сделок
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             {deals.length} deal{deals.length !== 1 ? 's' : ''} &middot;{' '}
             {formatCurrency(
               deals.reduce((sum: number, d: any) => sum + (d.value || 0), 0)
             )}{' '}
-            total value
+            общая сумма
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -265,7 +265,7 @@ export default function DealsPage() {
           </div>
           <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
             <Plus className="h-4 w-4" />
-            New Deal
+            Новая сделка
           </Button>
         </div>
       </div>
@@ -278,7 +278,7 @@ export default function DealsPage() {
           <AlertCircle className="h-10 w-10 text-destructive" />
           <p className="text-sm text-muted-foreground">{error}</p>
           <Button variant="outline" size="sm" onClick={fetchData}>
-            Try Again
+            Повторить
           </Button>
         </div>
       )}
@@ -353,7 +353,7 @@ export default function DealsPage() {
                   <div className="space-y-2 pr-2">
                     {stageDeals.length === 0 && (
                       <div className="flex items-center justify-center h-24 text-xs text-muted-foreground rounded-lg border border-dashed">
-                        No deals
+                        Пусто
                       </div>
                     )}
                     {stageDeals.map((deal) => (
@@ -547,13 +547,13 @@ export default function DealsPage() {
                 variant="outline"
                 onClick={() => setCreateOpen(false)}
               >
-                Cancel
+                Отмена
               </Button>
               <Button
                 onClick={handleCreateDeal}
                 disabled={!newTitle.trim() || creating}
               >
-                {creating ? 'Creating...' : 'Create Deal'}
+                {creating ? 'Создание...' : 'Создать сделку'}
               </Button>
             </div>
           </div>

@@ -66,11 +66,11 @@ function formatRelativeTime(dateStr: string): string {
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
 
-  if (seconds < 60) return 'Just now'
-  if (minutes < 60) return `${minutes}m ago`
-  if (hours < 24) return `${hours}h ago`
-  if (days < 30) return `${days}d ago`
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  if (seconds < 60) return 'только что'
+  if (minutes < 60) return `${minutes} мин назад`
+  if (hours < 24) return `${hours} ч назад`
+  if (days < 30) return `${days} д назад`
+  return new Date(dateStr).toLocaleDateString('ru-RU', {
     month: 'short',
     day: 'numeric',
   })
@@ -186,33 +186,33 @@ export function DashboardPage() {
 
   const statCards: StatCardConfig[] = [
     {
-      title: 'Total Deals',
+      title: 'Все сделки',
       value: totalDeals.toString(),
-      subtitle: `${openDeals} open \u00B7 ${lostDeals} lost`,
+      subtitle: `${openDeals} открытых \u00B7 ${lostDeals} потеряно`,
       icon: Package,
       iconBg: 'bg-primary/10',
       iconColor: 'text-primary',
     },
     {
-      title: 'Pipeline Value',
+      title: 'Воронка',
       value: formatCurrency(pipelineValue),
-      subtitle: `${openDeals} active deals`,
+      subtitle: `${openDeals} активных сделок`,
       icon: DollarSign,
       iconBg: 'bg-emerald-500/10',
       iconColor: 'text-emerald-500',
     },
     {
-      title: 'Won Deals',
+      title: 'Выиграно',
       value: wonDeals.toString(),
-      subtitle: `${formatCurrency(totalRevenue)} revenue`,
+      subtitle: `${formatCurrency(totalRevenue)} выручка`,
       icon: Trophy,
       iconBg: 'bg-amber-500/10',
       iconColor: 'text-amber-500',
     },
     {
-      title: 'Conversion Rate',
+      title: 'Конверсия',
       value: `${conversionRate}%`,
-      subtitle: `Won / Total`,
+      subtitle: `Выиграно / Всего`,
       icon: Target,
       iconBg: 'bg-violet-500/10',
       iconColor: 'text-violet-500',
@@ -244,7 +244,7 @@ export function DashboardPage() {
       <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-lg">
         <p className="font-medium text-foreground">{label}</p>
         <p className="text-muted-foreground">
-          {payload[0].value} deal{payload[0].value !== 1 ? 's' : ''}
+          {payload[0].value} сдел{payload[0].value !== 1 ? 'ок' : 'ка'}
         </p>
       </div>
     )
@@ -317,7 +317,7 @@ export function DashboardPage() {
       <Card className="flex flex-col items-center justify-center py-16">
         <AlertCircle className="mb-4 h-10 w-10 text-destructive" />
         <h3 className="mb-1 text-lg font-semibold text-foreground">
-          Something went wrong
+          Что-то пошло не так
         </h3>
         <p className="mb-4 text-sm text-muted-foreground">{error}</p>
         <button
@@ -325,7 +325,7 @@ export function DashboardPage() {
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <TrendingUp className="h-4 w-4" />
-          Try Again
+          Попробовать снова
         </button>
       </Card>
     )
@@ -370,7 +370,7 @@ export function DashboardPage() {
         {/* Bar Chart — Deals by Stage */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Deals by Stage</CardTitle>
+            <CardTitle className="text-base">Сделки по стадиям</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[280px]">
@@ -409,7 +409,7 @@ export function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              Deal Status Distribution
+              Статус сделок
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -441,7 +441,7 @@ export function DashboardPage() {
                               {d.name}
                             </p>
                             <p className="text-muted-foreground">
-                              {d.value} deal{d.value !== 1 ? 's' : ''}
+                              {d.value} сдел{d.value !== 1 ? 'ок' : 'ка'}
                             </p>
                           </div>
                         )
@@ -461,7 +461,7 @@ export function DashboardPage() {
                 </ResponsiveContainer>
               ) : (
                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                  No deal data yet
+                  Нет данных по сделкам
                 </div>
               )}
             </div>
@@ -474,13 +474,13 @@ export function DashboardPage() {
         {/* Recent Deals */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Recent Deals</CardTitle>
+            <CardTitle className="text-base">Последние сделки</CardTitle>
           </CardHeader>
           <CardContent>
             <ScrollArea className="max-h-[340px]">
               {recentDeals.length === 0 ? (
                 <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
-                  No deals yet
+                  Сделок пока нет
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -522,20 +522,20 @@ export function DashboardPage() {
         {/* Activity Feed */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Activity Feed</CardTitle>
+            <CardTitle className="text-base">Лента активности</CardTitle>
           </CardHeader>
           <CardContent>
             <ScrollArea className="max-h-[340px]">
               {activities.length === 0 ? (
                 <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
-                  No recent activity
+                  Нет активности
                 </div>
               ) : (
                 <div className="space-y-1">
                   {activities.map((activity) => {
                     const Icon = getActivityIcon(activity.action)
                     const actorName =
-                      activity.users?.[0]?.name ?? 'Unknown'
+                      activity.users?.[0]?.name ?? 'Неизвестный'
                     return (
                       <div
                         key={activity.id}

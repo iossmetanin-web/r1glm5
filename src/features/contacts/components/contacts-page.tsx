@@ -46,11 +46,11 @@ interface ContactFormData {
 
 const STAGE_OPTIONS: ContactStage[] = ['Lead', 'Negotiation', 'Customer', 'Churned']
 
-const STAGE_BADGE_MAP: Record<string, { className: string }> = {
-  lead: { className: 'bg-muted text-muted-foreground hover:bg-muted/80' },
-  negotiation: { className: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 border-amber-500/25' },
-  customer: { className: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/25' },
-  churned: { className: 'bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/20 border-red-500/25' },
+const STAGE_BADGE_MAP: Record<string, { classИмя: string }> = {
+  lead: { classИмя: 'bg-muted text-muted-foreground hover:bg-muted/80' },
+  negotiation: { classИмя: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 border-amber-500/25' },
+  customer: { classИмя: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/25' },
+  churned: { classИмя: 'bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/20 border-red-500/25' },
 }
 
 const EMPTY_FORM: ContactFormData = {
@@ -74,7 +74,7 @@ function formatDate(dateStr: string): string {
 
 function getStageBadgeVariant(stage: string | null): string {
   if (!stage) return ''
-  return STAGE_BADGE_MAP[stage.toLowerCase()]?.className ?? STAGE_BADGE_MAP.lead.className
+  return STAGE_BADGE_MAP[stage.toLowerCase()]?.classИмя ?? STAGE_BADGE_MAP.lead.classИмя
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -119,7 +119,7 @@ export default function ContactsPage() {
         }
       } catch (err: unknown) {
         if (cancelled) return
-        const message = err instanceof Error ? err.message : 'Failed to fetch contacts'
+        const message = err instanceof Error ? err.message : 'Не удалось загрузить контакты'
         setError(message)
       }
       setLoading(false)
@@ -251,63 +251,63 @@ export default function ContactsPage() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col gap-4 h-full">
+    <div classИмя="flex flex-col gap-4 h-full">
       {/* ── Top Bar ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div classИмя="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-            <Users className="h-5 w-5 text-muted-foreground" />
+          <h2 classИмя="text-xl font-semibold tracking-tight flex items-center gap-2">
+            <Users classИмя="h-5 w-5 text-muted-foreground" />
             Contacts
           </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <p classИмя="text-sm text-muted-foreground mt-0.5">
             {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
             {searchQuery.trim() && filteredContacts.length !== contacts.length
               ? ` · ${filteredContacts.length} shown`
               : ''}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div classИмя="flex items-center gap-2 flex-wrap">
+          <div classИмя="relative">
+            <Search classИмя="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search contacts…"
+              placeholder="Поиск контактов…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 w-full sm:w-[220px] h-9"
+              classИмя="pl-8 w-full sm:w-[220px] h-9"
             />
           </div>
-          <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
-            <Plus className="h-4 w-4" />
-            Add Contact
+          <Button size="sm" onClick={openCreateDialog} classИмя="gap-1.5">
+            <Plus classИмя="h-4 w-4" />
+            Добавить контакт
           </Button>
         </div>
       </div>
 
       {/* ── Error State ────────────────────────────────────────────────────── */}
       {error && !loading && (
-        <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <AlertCircle className="h-10 w-10 text-destructive" />
-          <p className="text-sm text-muted-foreground max-w-md text-center">{error}</p>
+        <div classИмя="flex flex-col items-center justify-center py-16 gap-3">
+          <AlertCircle classИмя="h-10 w-10 text-destructive" />
+          <p classИмя="text-sm text-muted-foreground max-w-md text-center">{error}</p>
           <Button variant="outline" size="sm" onClick={refresh}>
-            Try Again
+            Повторить
           </Button>
         </div>
       )}
 
       {/* ── Loading State ──────────────────────────────────────────────────── */}
       {loading && (
-        <div className="border border-border rounded-lg overflow-hidden">
-          <div className="bg-muted/50 px-4 py-3 flex gap-6">
-            {['Name', 'Company', 'Phone', 'Email', 'Stage', 'Created', 'Actions'].map(
+        <div classИмя="border border-border rounded-lg overflow-hidden">
+          <div classИмя="bg-muted/50 px-4 py-3 flex gap-6">
+            {['Имя', 'Company', 'Phone', 'Email', 'Stage', 'Created', 'Actions'].map(
               (col) => (
-                <Skeleton key={col} className="h-4 w-16" />
+                <Skeleton key={col} classИмя="h-4 w-16" />
               )
             )}
           </div>
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="px-4 py-3 flex gap-6 border-b border-border last:border-0">
+            <div key={i} classИмя="px-4 py-3 flex gap-6 border-b border-border last:border-0">
               {Array.from({ length: 7 }).map((_, j) => (
-                <Skeleton key={j} className="h-4 flex-1" />
+                <Skeleton key={j} classИмя="h-4 flex-1" />
               ))}
             </div>
           ))}
@@ -316,97 +316,97 @@ export default function ContactsPage() {
 
       {/* ── Empty State ────────────────────────────────────────────────────── */}
       {!loading && !error && contacts.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <div className="h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center">
-            <Users className="h-7 w-7 text-muted-foreground" />
+        <div classИмя="flex flex-col items-center justify-center py-20 gap-4">
+          <div classИмя="h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center">
+            <Users classИмя="h-7 w-7 text-muted-foreground" />
           </div>
-          <div className="text-center">
-            <p className="text-base font-medium text-foreground">No contacts yet</p>
-            <p className="text-sm text-muted-foreground mt-1">
+          <div classИмя="text-center">
+            <p classИмя="text-base font-medium text-foreground">Нет контактов</p>
+            <p classИмя="text-sm text-muted-foreground mt-1">
               Add your first contact to get started
             </p>
           </div>
-          <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
-            <Plus className="h-4 w-4" />
-            Add Contact
+          <Button size="sm" onClick={openCreateDialog} classИмя="gap-1.5">
+            <Plus classИмя="h-4 w-4" />
+            Добавить контакт
           </Button>
         </div>
       )}
 
       {/* ── Search No Results ──────────────────────────────────────────────── */}
       {!loading && !error && contacts.length > 0 && filteredContacts.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <Search className="h-8 w-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            No contacts match &ldquo;{searchQuery}&rdquo;
+        <div classИмя="flex flex-col items-center justify-center py-16 gap-3">
+          <Search classИмя="h-8 w-8 text-muted-foreground" />
+          <p classИмя="text-sm text-muted-foreground">
+            Контакты по запросу &ldquo;{searchQuery}&rdquo;
           </p>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setSearchQuery('')}
           >
-            Clear search
+            Сбросить
           </Button>
         </div>
       )}
 
       {/* ── Table ──────────────────────────────────────────────────────────── */}
       {!loading && !error && filteredContacts.length > 0 && (
-        <div className="border border-border rounded-lg overflow-hidden flex-1">
-          <div className="overflow-x-auto">
+        <div classИмя="border border-border rounded-lg overflow-hidden flex-1">
+          <div classИмя="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/50 hover:bg-muted/50">
-                  <TableHead className="pl-4">Name</TableHead>
+                <TableRow classИмя="bg-muted/50 hover:bg-muted/50">
+                  <TableHead classИмя="pl-4">Имя</TableHead>
                   <TableHead>Company</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Stage</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead className="pr-4 text-right">Actions</TableHead>
+                  <TableHead classИмя="pr-4 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredContacts.map((contact) => (
-                  <TableRow key={contact.id} className="hover:bg-accent/50">
-                    <TableCell className="pl-4 font-medium text-foreground">
+                  <TableRow key={contact.id} classИмя="hover:bg-accent/50">
+                    <TableCell classИмя="pl-4 font-medium text-foreground">
                       {contact.name}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell classИмя="text-muted-foreground">
                       {contact.company || '—'}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell classИмя="text-muted-foreground">
                       {contact.phone || '—'}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell classИмя="text-muted-foreground">
                       {contact.email || '—'}
                     </TableCell>
                     <TableCell>
                       <Badge
                         variant="outline"
-                        className={`text-xs capitalize ${getStageBadgeVariant(contact.stage)}`}
+                        classИмя={`text-xs capitalize ${getStageBadgeVariant(contact.stage)}`}
                       >
                         {contact.stage || 'Lead'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
+                    <TableCell classИмя="text-muted-foreground text-xs">
                       {formatDate(contact.created_at)}
                     </TableCell>
-                    <TableCell className="pr-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                    <TableCell classИмя="pr-4 text-right">
+                      <div classИмя="flex items-center justify-end gap-1">
                         <button
                           onClick={() => openEditDialog(contact)}
-                          className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          classИмя="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                           aria-label={`Edit ${contact.name}`}
                         >
-                          <Pencil className="h-3.5 w-3.5" />
+                          <Pencil classИмя="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => handleDelete(contact)}
-                          className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          classИмя="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                           aria-label={`Delete ${contact.name}`}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 classИмя="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </TableCell>
@@ -426,27 +426,27 @@ export default function ContactsPage() {
           setForm(EMPTY_FORM)
         }
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent classИмя="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle classИмя="flex items-center gap-2">
               {editingContact ? (
                 <>
-                  <Pencil className="h-5 w-5" />
-                  Edit Contact
+                  <Pencil classИмя="h-5 w-5" />
+                  Редактировать контакт
                 </>
               ) : (
                 <>
-                  <Plus className="h-5 w-5" />
-                  New Contact
+                  <Plus classИмя="h-5 w-5" />
+                  Новый контакт
                 </>
               )}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
-            {/* Name */}
-            <div className="space-y-2">
+          <div classИмя="space-y-4 pt-2">
+            {/* Имя */}
+            <div classИмя="space-y-2">
               <Label htmlFor="contact-name">
-                Name <span className="text-destructive">*</span>
+                Имя <span classИмя="text-destructive">*</span>
               </Label>
               <Input
                 id="contact-name"
@@ -460,7 +460,7 @@ export default function ContactsPage() {
             </div>
 
             {/* Company */}
-            <div className="space-y-2">
+            <div classИмя="space-y-2">
               <Label htmlFor="contact-company">Company</Label>
               <Input
                 id="contact-company"
@@ -471,8 +471,8 @@ export default function ContactsPage() {
             </div>
 
             {/* Phone + Email */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <div classИмя="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div classИмя="space-y-2">
                 <Label htmlFor="contact-phone">Phone</Label>
                 <Input
                   id="contact-phone"
@@ -481,7 +481,7 @@ export default function ContactsPage() {
                   onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                 />
               </div>
-              <div className="space-y-2">
+              <div classИмя="space-y-2">
                 <Label htmlFor="contact-email">Email</Label>
                 <Input
                   id="contact-email"
@@ -494,13 +494,13 @@ export default function ContactsPage() {
             </div>
 
             {/* Stage */}
-            <div className="space-y-2">
+            <div classИмя="space-y-2">
               <Label>Stage</Label>
               <Select
                 value={form.stage}
                 onValueChange={(v) => setForm((f) => ({ ...f, stage: v as ContactStage }))}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger classИмя="w-full">
                   <SelectValue placeholder="Select stage" />
                 </SelectTrigger>
                 <SelectContent>
@@ -514,7 +514,7 @@ export default function ContactsPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-2 pt-2">
+            <div classИмя="flex justify-end gap-2 pt-2">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -523,17 +523,17 @@ export default function ContactsPage() {
                   setForm(EMPTY_FORM)
                 }}
               >
-                Cancel
+                Отмена
               </Button>
               <Button
                 onClick={handleSave}
                 disabled={!form.name.trim() || saving}
               >
                 {saving
-                  ? 'Saving…'
+                  ? 'Сохранение…'
                   : editingContact
-                    ? 'Update Contact'
-                    : 'Create Contact'}
+                    ? 'Обновить контакт'
+                    : 'Создать контакт'}
               </Button>
             </div>
           </div>
