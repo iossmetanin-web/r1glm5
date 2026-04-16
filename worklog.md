@@ -106,3 +106,30 @@ Stage Summary:
 - Flow: spinner → login form (if no session) → CRM app (if authenticated)
 - Old user picker completely eliminated from codebase
 - AppShell is now a pure layout component with zero auth logic
+
+---
+Task ID: 5
+Agent: main
+Task: Upgrade login screen to premium Apple-level SaaS experience
+
+Work Log:
+- Read login-form.tsx and globals.css
+- Added 5 keyframe animations to globals.css: login-bg-shift (20s gradient movement), login-glow-pulse (8s radial glow breathe), login-icon-pulse (4s subtle scale), login-fade-up (0.6s entrance), login-card-float (6s gentle float)
+- Enhanced login-form.tsx visual layer ONLY — all auth logic byte-for-byte identical:
+  - Background: slow animated gradient (300% size, 20s cycle) + radial blue glow behind card (8s breathe)
+  - Logo: gradient blue→light-blue icon with 4s pulse animation + soft glow shadow + drop shadow
+  - Card: glass-morphism (bg-white/70, backdrop-blur 24px, inset highlight), 24px radius, large diffused shadow, 6s float animation
+  - Typography: "Управляйте сделками быстрее и проще" subtitle, 26px title with -0.02em tracking
+  - Inputs: 52px height, rounded-2xl, glass bg (muted/40), focus → white bg + blue border + 3px ring, softer placeholder color
+  - Button: gradient blue background, 52px pill with 2xl radius, hover lift (-1px), click press (scale 0.98)
+  - Error: fade-up animation on appear, subtle bg with border
+  - Footer: lighter opacity (0.40), wider tracking
+  - Overall: more vertical spacing (space-y-6), fade-up entrance (0.6s cubic-bezier)
+- Ran lint: 0 errors
+- Clean rebuild from scratch: GET / 200 OK
+
+Stage Summary:
+- Login screen upgraded to Apple/Stripe/Linear-level premium feel
+- Auth logic, Supabase integration, routing — completely unchanged
+- 2 files modified: globals.css (5 keyframes) + login-form.tsx (visual layer only)
+- Russian language preserved
