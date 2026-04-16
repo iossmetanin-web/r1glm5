@@ -1,29 +1,7 @@
 'use client'
 
-import {
-  LayoutDashboard,
-  Kanban,
-  Users,
-  CheckSquare,
-  Settings,
-} from 'lucide-react'
 import { useNavigationStore } from '@/lib/store'
-import type { AppView } from '@/lib/store'
-import type { LucideIcon } from 'lucide-react'
-
-interface MobileNavItem {
-  view: AppView
-  label: string
-  icon: LucideIcon
-}
-
-const mobileNavItems: MobileNavItem[] = [
-  { view: 'dashboard', label: 'Панель', icon: LayoutDashboard },
-  { view: 'deals', label: 'Сделки', icon: Kanban },
-  { view: 'contacts', label: 'Контакты', icon: Users },
-  { view: 'tasks', label: 'Задачи', icon: CheckSquare },
-  { view: 'settings', label: 'Настройки', icon: Settings },
-]
+import { NAV_SECTIONS } from '@/lib/section-colors'
 
 export function MobileNav() {
   const currentView = useNavigationStore((s) => s.currentView)
@@ -33,44 +11,52 @@ export function MobileNav() {
     <nav className="fixed inset-x-0 bottom-0 z-50 md:hidden">
       {/* Safe area spacer */}
       <div className="pb-[env(safe-area-inset-bottom)]">
-        {/* Border top with subtle gradient */}
-        <div className="border-t border-border/80 bg-card/95 backdrop-blur-lg">
-          <div className="flex items-center justify-around px-2 py-1">
-            {mobileNavItems.map((item) => {
-              const Icon = item.icon
-              const isActive = currentView === item.view
+        <div className="border-t border-border/60 bg-card/95 backdrop-blur-lg">
+          <div className="flex items-center justify-around px-1 py-1">
+            {NAV_SECTIONS.map((section) => {
+              const Icon = section.icon
+              const isActive = currentView === section.view
 
               return (
                 <button
-                  key={item.view}
-                  onClick={() => navigate(item.view)}
+                  key={section.view}
+                  onClick={() => navigate(section.view)}
                   className="relative flex flex-1 flex-col items-center gap-0.5 py-2"
                 >
                   {/* Active pill background */}
                   <div
-                    className={`absolute inset-y-1 inset-x-1 rounded-xl transition-all duration-200 ease-in-out ${
+                    className={`absolute inset-y-1 inset-x-1.5 rounded-xl transition-all duration-200 ease-in-out ${
                       isActive
-                        ? 'bg-primary/10 scale-100 opacity-100'
-                        : 'scale-95 opacity-0'
+                        ? `${section.tintClass} scale-100 opacity-100`
+                        : 'scale-90 opacity-0'
                     }`}
                   />
                   {/* Content */}
                   <div className="relative flex flex-col items-center gap-0.5">
-                    <Icon
-                      className={`h-5 w-5 transition-all duration-200 ease-in-out ${
+                    {/* Icon — colored circle when active, outline when inactive */}
+                    <div
+                      className={`flex h-7 w-7 items-center justify-center rounded-full transition-all duration-200 ease-in-out ${
                         isActive
-                          ? 'text-primary scale-110'
-                          : 'text-muted-foreground'
+                          ? `${section.bgClass} shadow-sm ${section.shadowClass}`
+                          : ''
                       }`}
-                    />
+                    >
+                      <Icon
+                        className={`h-[14px] w-[14px] transition-all duration-200 ease-in-out ${
+                          isActive
+                            ? 'text-white scale-100'
+                            : 'text-muted-foreground scale-95'
+                        }`}
+                      />
+                    </div>
                     <span
                       className={`text-[10px] font-medium leading-none transition-all duration-200 ease-in-out ${
                         isActive
-                          ? 'text-primary'
+                          ? section.accentTextClass
                           : 'text-muted-foreground'
                       }`}
                     >
-                      {item.label}
+                      {section.label}
                     </span>
                   </div>
                 </button>

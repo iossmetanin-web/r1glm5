@@ -55,7 +55,7 @@ export function AppShell({ children }: AppShellProps) {
       {/* Main content area */}
       <div
         className={`flex min-h-screen flex-col transition-[margin-left] duration-300 ease-in-out ${
-          sidebarCollapsed ? 'md:ml-[68px]' : 'md:ml-[240px]'
+          sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[248px]'
         }`}
       >
         {/* Header: hidden on mobile (md:flex), visible on desktop */}
