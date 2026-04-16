@@ -758,7 +758,7 @@ export function CompaniesPage() {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm text-muted-foreground">
-                            {company.manager?.name || '—'}
+                            {company.manager?.name || company.manager_name || '—'}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -872,7 +872,7 @@ export function CompaniesPage() {
                   {/* Footer: manager + next contact */}
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">
-                      {company.manager?.name || 'Без менеджера'}
+                      {company.manager?.name || company.manager_name || 'Без менеджера'}
                     </span>
                     {company.next_contact_date && (
                       <span className={contactLabel.className}>

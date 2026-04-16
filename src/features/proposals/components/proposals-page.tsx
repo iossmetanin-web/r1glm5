@@ -740,7 +740,7 @@ export function ProposalsPage() {
                           </TableCell>
                           <TableCell>
                             <span className="text-sm text-muted-foreground">
-                              {proposal.manager?.name || '—'}
+                              {proposal.manager?.name || proposal.manager_name || '—'}
                             </span>
                           </TableCell>
                           <TableCell>
@@ -1037,7 +1037,7 @@ export function ProposalsPage() {
 
                     {/* Manager */}
                     <div className="mt-2 text-xs text-muted-foreground">
-                      Менеджер: {proposal.manager?.name || '—'}
+                      Менеджер: {proposal.manager?.name || proposal.manager_name || '—'}
                     </div>
 
                     {/* Expand/collapse icon */}

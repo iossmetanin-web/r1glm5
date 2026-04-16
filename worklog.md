@@ -315,3 +315,29 @@ Stage Summary:
 - Tasks support recurring, shared, company-linked, today queue views
 - All Russian text, mobile-responsive, shadcn/ui components
 - Old deals-page.tsx still exists but is no longer imported (dead code)
+
+---
+Task ID: 3-a
+Agent: subagent
+Task: Fix manager_name display across all CRM pages
+
+Work Log:
+- Diagnosed: imported data has manager_id=NULL but manager_name populated ("Алик", "Магел", "Рам", "Анар"). Supabase join `manager:users!manager_id(...)` returns null because manager_id is null, so all pages show "—" instead of the manager name.
+- Fixed companies-page.tsx (2 locations):
+  - Desktop table (line 761): `company.manager?.name || '—'` → `company.manager?.name || company.manager_name || '—'`
+  - Mobile cards (line 875): `company.manager?.name || 'Без менеджера'` → `company.manager?.name || company.manager_name || 'Без менеджера'`
+- Fixed company-detail-page.tsx (1 location):
+  - Manager display section (line 727-731): Changed condition from `company.manager &&` to `(company.manager || company.manager_name) &&`, and display from `company.manager.name` to `company.manager?.name || company.manager_name`
+- Fixed proposals-page.tsx (2 locations):
+  - Desktop table (line 743): `proposal.manager?.name || '—'` → `proposal.manager?.name || proposal.manager_name || '—'`
+  - Mobile cards expanded detail (line 1040): `proposal.manager?.name || '—'` → `proposal.manager?.name || proposal.manager_name || '—'`
+- Checked dashboard-page.tsx: No company manager name displayed (activities show `activity.user.name` which works fine since activities are created by logged-in users). No changes needed.
+- Ran lint: 0 errors
+- Note: "Мои" filter in companies and proposals pages still filters by `manager_id === currentUser.id` which won't match imported records with null manager_id. This was intentionally left as-is per task instructions.
+
+Stage Summary:
+- 5 display locations fixed across 3 files
+- Pattern: `something.manager?.name || '—'` → `something.manager?.name || something.manager_name || '—'`
+- All imported company/proposal records will now show their manager names from the `manager_name` column
+- No logic changes, no backend changes
+- Lint passes cleanly

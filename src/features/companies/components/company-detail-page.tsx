@@ -724,10 +724,10 @@ export function CompanyDetailPage() {
               </div>
 
               {/* Manager */}
-              {company.manager && (
+              {(company.manager || company.manager_name) && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                   <User className="h-3.5 w-3.5" />
-                  Ответственный: <span className="font-medium text-foreground">{company.manager.name}</span>
+                  Ответственный: <span className="font-medium text-foreground">{company.manager?.name || company.manager_name}</span>
                 </p>
               )}
 
