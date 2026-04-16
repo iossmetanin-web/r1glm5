@@ -1,14 +1,17 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useSyncExternalStore } from 'react'
 import { AppShell } from '@/features/layout/components/app-shell'
 import { MobileNav } from '@/features/layout/components/mobile-nav'
-import { useNavigationStore, useAuthStore } from '@/lib/store'
+import { LoginForm } from '@/features/auth/components/login-form'
+import { useNavigationStore, useAuthStore, restoreSession } from '@/lib/store'
 import { DashboardPage } from '@/features/dashboard/components/dashboard-page'
 import DealsPage from '@/features/deals/components/deals-page'
 import ContactsPage from '@/features/contacts/components/contacts-page'
 import TasksPage from '@/features/tasks/components/tasks-page'
 import { SettingsPage } from '@/features/settings/components/settings-page'
+import { Loader2 } from 'lucide-react'
 
 // SSR-safe mounted detection using useSyncExternalStore
 const emptySubscribe = () => () => {}
@@ -21,9 +24,31 @@ function useIsMounted() {
 }
 
 function AppContent() {
-  const currentView = useNavigationStore((s) => s.currentView)
   const currentUser = useAuthStore((s) => s.currentUser)
+  const loading = useAuthStore((s) => s.loading)
+  const hydrated = useAuthStore((s) => s.hydrated)
+  const currentView = useNavigationStore((s) => s.currentView)
 
+  // Restore Supabase Auth session — runs once in browser
+  useEffect(() => {
+    restoreSession()
+  }, [])
+
+  // Waiting for Supabase session check
+  if (!hydrated || loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  // NOT authenticated → show login page
+  if (!currentUser) {
+    return <LoginForm />
+  }
+
+  // Authenticated → show CRM app
   const views: Record<string, React.ReactNode> = {
     dashboard: <DashboardPage />,
     deals: <DealsPage />,
@@ -35,7 +60,7 @@ function AppContent() {
   return (
     <>
       <AppShell>{views[currentView] || <DashboardPage />}</AppShell>
-      {currentUser && <MobileNav />}
+      <MobileNav />
     </>
   )
 }

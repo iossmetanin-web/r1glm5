@@ -80,3 +80,29 @@ Stage Summary:
 - Auto-creates CRM profile for new Supabase Auth users
 - Russian UI language preserved throughout
 - No changes to existing CRM pages (Dashboard, Deals, Contacts, Tasks, Settings)
+
+---
+Task ID: 4
+Agent: main
+Task: Fix auth routing — login page not being used, old user picker still showing
+
+Work Log:
+- Diagnosed: auth gate was buried inside AppShell, causing stale code/cache issues
+- Cleared .next build cache completely
+- Rewrote `src/app/page.tsx`: auth gate moved to root page level
+  - `AppContent` now explicitly checks: loading → LoginForm → CRM
+  - `restoreSession()` called from page.tsx (not AppShell)
+  - `LoginForm` renders when `!currentUser`
+  - `MobileNav` only renders after authentication
+- Simplified `src/features/layout/components/app-shell.tsx`: removed ALL auth logic
+  - Now a pure layout component (Sidebar + Header + main content area)
+  - No more imports of LoginForm, useAuthStore, restoreSession
+- Old user picker code no longer exists anywhere in source
+- Cleared .next cache, restarted dev server, compiled from scratch: GET / 200 OK
+- Ran lint: 0 errors
+
+Stage Summary:
+- Auth routing fixed: page.tsx is now the single auth gate
+- Flow: spinner → login form (if no session) → CRM app (if authenticated)
+- Old user picker completely eliminated from codebase
+- AppShell is now a pure layout component with zero auth logic

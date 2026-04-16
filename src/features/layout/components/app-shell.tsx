@@ -1,9 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
-import { Loader2 } from 'lucide-react'
-import { useAuthStore, useUIStore, restoreSession } from '@/lib/store'
-import { LoginForm } from '@/features/auth/components/login-form'
+import { useUIStore } from '@/lib/store'
 import { Sidebar } from './sidebar'
 import { Header } from './header'
 
@@ -12,40 +9,8 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const currentUser = useAuthStore((s) => s.currentUser)
-  const loading = useAuthStore((s) => s.loading)
-  const hydrated = useAuthStore((s) => s.hydrated)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
 
-  // Restore session from localStorage — runs only in browser
-  useEffect(() => {
-    restoreSession()
-  }, [])
-
-  // Not yet hydrated (still checking localStorage) — show nothing
-  if (!hydrated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  // Still loading session
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  // Not authenticated — show login
-  if (!currentUser) {
-    return <LoginForm />
-  }
-
-  // Authenticated — render shell
   return (
     <div className="min-h-screen bg-background">
       {/* Sidebar: hidden on mobile (md:block), visible on desktop */}
