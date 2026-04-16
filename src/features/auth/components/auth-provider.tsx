@@ -1,12 +1,13 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import type { User } from '@supabase/supabase-js'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import type { User as CrmUser } from '@/lib/supabase/database.types'
+import { useAuthStore } from '@/lib/store'
 
 interface AuthContextType {
-  user: User | null
+  user: SupabaseUser | null
   crmUser: CrmUser | null
   loading: boolean
   signOut: () => Promise<void>
@@ -26,13 +27,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
 
   const fetchCrmUser = useCallback(
-    async (authUserId: string) => {
-      const { data } = await supabase
+    async (authUserId: string, authEmail: string) => {
+      // Try to find CRM user by email first, then by ID
+      let { data } = await supabase
         .from('users')
         .select('*')
-        .eq('id', authUserId)
+        .eq('email', authEmail)
         .single()
-      setCrmUser(data ?? null)
+
+      if (!data) {
+        const { data: dataById } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUserId)
+          .single()
+        data = dataById
+      }
+
+      if (data) {
+        setCrmUser(data)
+      }
     },
     [supabase],
   )
@@ -43,8 +57,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         data: { user },
       } = await supabase.auth.getUser()
       setUser(user)
-      if (user) {
-        await fetchCrmUser(user.id)
+      if (user?.email) {
+        await fetchCrmUser(user.id, user.email)
       }
       setLoading(false)
     }
@@ -53,9 +67,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        await fetchCrmUser(session.user.id)
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+        setCrmUser(null)
+        return
+      }
+
+      const authUser = session?.user ?? null
+      setUser(authUser)
+
+      if (authUser?.email) {
+        await fetchCrmUser(authUser.id, authUser.email)
       } else {
         setCrmUser(null)
       }
@@ -67,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
+    useAuthStore.getState().logout()
   }
 
   return (

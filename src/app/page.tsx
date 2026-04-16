@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from 'react'
 import { AppShell } from '@/features/layout/components/app-shell'
 import { MobileNav } from '@/features/layout/components/mobile-nav'
-import { useNavigationStore } from '@/lib/store'
+import { useNavigationStore, useAuthStore } from '@/lib/store'
 import { DashboardPage } from '@/features/dashboard/components/dashboard-page'
 import DealsPage from '@/features/deals/components/deals-page'
 import ContactsPage from '@/features/contacts/components/contacts-page'
@@ -22,6 +22,7 @@ function useIsMounted() {
 
 function AppContent() {
   const currentView = useNavigationStore((s) => s.currentView)
+  const currentUser = useAuthStore((s) => s.currentUser)
 
   const views: Record<string, React.ReactNode> = {
     dashboard: <DashboardPage />,
@@ -31,7 +32,12 @@ function AppContent() {
     settings: <SettingsPage />,
   }
 
-  return <AppShell>{views[currentView] || <DashboardPage />}</AppShell>
+  return (
+    <>
+      <AppShell>{views[currentView] || <DashboardPage />}</AppShell>
+      {currentUser && <MobileNav />}
+    </>
+  )
 }
 
 export default function Home() {
@@ -46,10 +52,5 @@ export default function Home() {
     )
   }
 
-  return (
-    <>
-      <AppContent />
-      <MobileNav />
-    </>
-  )
+  return <AppContent />
 }

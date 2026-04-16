@@ -23,7 +23,7 @@ export const useNavigationStore = create<NavigationState>((set) => ({
   goBack: () => set((s) => ({ currentView: s.previousView || 'dashboard', selectedDealId: null })),
 }))
 
-// ─── Auth (simple — custom users table) ──────────────────────────────────────
+// ─── Auth (Supabase Auth + CRM users table) ──────────────────────────────────
 
 interface AuthState {
   currentUser: User | null
@@ -50,6 +50,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       try { localStorage.removeItem('crm_user_id') } catch { /* ignore */ }
     }
     set({ currentUser: null })
+    // Sign out from Supabase Auth (fire-and-forget)
+    import('@/lib/supabase/client').then(({ supabase }) => {
+      supabase.auth.signOut().catch(() => {})
+    })
   },
   setLoading: (loading) => set({ loading }),
   setHydrated: () => set({ hydrated: true }),
@@ -71,13 +75,42 @@ export async function restoreSession() {
   }
 
   try {
-    const savedId = localStorage.getItem('crm_user_id')
-    if (savedId) {
-      // Dynamic import to avoid SSR issues — Supabase client only loaded in browser
-      const { supabase } = await import('@/lib/supabase/client')
-      const { data } = await supabase.from('users').select('*').eq('id', savedId).single()
-      if (data) {
-        useAuthStore.getState().login(data)
+    // Dynamic import to avoid SSR issues — Supabase client only loaded in browser
+    const { supabase } = await import('@/lib/supabase/client')
+
+    // Check for active Supabase Auth session
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (session?.user) {
+      const authEmail = session.user.email
+      if (authEmail) {
+        // Fetch CRM user by matching email
+        const { data: crmUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', authEmail)
+          .single()
+
+        if (crmUser) {
+          useAuthStore.getState().login(crmUser)
+        } else {
+          // Auth session exists but no CRM profile — create one
+          const newUser = {
+            id: session.user.id,
+            name: session.user.user_metadata?.full_name || authEmail.split('@')[0],
+            email: authEmail,
+            role: 'admin' as const,
+          }
+          const { data: createdUser } = await supabase
+            .from('users')
+            .insert(newUser)
+            .select()
+            .single()
+
+          if (createdUser) {
+            useAuthStore.getState().login(createdUser)
+          }
+        }
       }
     }
   } catch {
