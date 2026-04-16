@@ -10,6 +10,7 @@ export interface Database {
           id: string; name: string; inn: string | null; city: string | null
           website: string | null; contact_phone: string | null; contact_email: string | null
           source: string | null; status: string | null; manager_id: string | null
+          manager_name: string | null
           next_contact_date: string | null; lost_reason: string | null; notes: string | null
           created_at: string; updated_at: string
         }
@@ -17,6 +18,7 @@ export interface Database {
           id?: string; name: string; inn?: string | null; city?: string | null
           website?: string | null; contact_phone?: string | null; contact_email?: string | null
           source?: string | null; status?: string | null; manager_id?: string | null
+          manager_name?: string | null
           next_contact_date?: string | null; lost_reason?: string | null; notes?: string | null
           created_at?: string; updated_at?: string
         }
@@ -24,6 +26,7 @@ export interface Database {
           id?: string; name?: string; inn?: string | null; city?: string | null
           website?: string | null; contact_phone?: string | null; contact_email?: string | null
           source?: string | null; status?: string | null; manager_id?: string | null
+          manager_name?: string | null
           next_contact_date?: string | null; lost_reason?: string | null; notes?: string | null
           created_at?: string; updated_at?: string
         }
@@ -52,16 +55,19 @@ export interface Database {
       proposals: {
         Row: {
           id: string; company_id: string; manager_id: string | null
+          manager_name: string | null
           number: string | null; status: string | null; total_amount: number | null
           valid_until: string | null; notes: string | null; created_at: string; updated_at: string
         }
         Insert: {
           id?: string; company_id: string; manager_id?: string | null
+          manager_name?: string | null
           number?: string | null; status?: string | null; total_amount?: number | null
           valid_until?: string | null; notes?: string | null; created_at?: string; updated_at?: string
         }
         Update: {
           id?: string; company_id?: string; manager_id?: string | null
+          manager_name?: string | null
           number?: string | null; status?: string | null; total_amount?: number | null
           valid_until?: string | null; notes?: string | null; created_at?: string; updated_at?: string
         }
