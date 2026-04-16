@@ -235,7 +235,7 @@ export default function DealsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-            <Package className="h-5 w-5 text-muted-foreground" />
+            <Package className="h-5 w-5 text-amber-500" />
             Воронка сделок
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -256,7 +256,7 @@ export default function DealsPage() {
                 onClick={() => setFilter(f)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                   filter === f
-                    ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                    ? 'bg-amber-500 text-white shadow-sm shadow-primary/20'
                     : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'
                 }`}
               >

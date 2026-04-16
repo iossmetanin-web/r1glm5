@@ -1,11 +1,17 @@
 'use client'
 
 import {
+  LayoutDashboard,
+  Kanban,
+  Users,
+  CheckSquare,
+  Settings,
   ChevronLeft,
   ChevronRight,
   Zap,
   LogOut,
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   Tooltip,
   TooltipContent,
@@ -15,7 +21,25 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useNavigationStore, useAuthStore, useUIStore } from '@/lib/store'
-import { NAV_SECTIONS } from '@/lib/section-colors'
+import type { AppView } from '@/lib/store'
+import type { LucideIcon } from 'lucide-react'
+
+interface NavItem {
+  view: AppView
+  label: string
+  icon: LucideIcon
+  color: string   // Tailwind bg class for icon circle
+  tint: string    // Tailwind bg class for active tint
+  text: string    // Tailwind text class for active label
+}
+
+const navItems: NavItem[] = [
+  { view: 'dashboard', label: 'Панель', icon: LayoutDashboard, color: 'bg-blue-500', tint: 'bg-blue-50', text: 'text-blue-600' },
+  { view: 'deals', label: 'Сделки', icon: Kanban, color: 'bg-amber-500', tint: 'bg-amber-50', text: 'text-amber-600' },
+  { view: 'contacts', label: 'Контакты', icon: Users, color: 'bg-emerald-500', tint: 'bg-emerald-50', text: 'text-emerald-600' },
+  { view: 'tasks', label: 'Задачи', icon: CheckSquare, color: 'bg-violet-500', tint: 'bg-violet-50', text: 'text-violet-600' },
+  { view: 'settings', label: 'Настройки', icon: Settings, color: 'bg-gray-500', tint: 'bg-gray-50', text: 'text-gray-600' },
+]
 
 export function Sidebar() {
   const currentView = useNavigationStore((s) => s.currentView)
@@ -37,12 +61,12 @@ export function Sidebar() {
   return (
     <aside
       className={`hidden md:flex fixed inset-y-0 left-0 z-40 flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out ${
-        sidebarCollapsed ? 'w-[72px]' : 'w-[248px]'
+        sidebarCollapsed ? 'w-[68px]' : 'w-[240px]'
       }`}
     >
       {/* ── Logo ─────────────────────────────────────────── */}
       <div className="flex h-14 shrink-0 items-center gap-3 border-b border-sidebar-border px-4">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary shadow-sm shadow-primary/25 transition-transform duration-200 hover:scale-105">
           <Zap className="h-[18px] w-[18px] text-primary-foreground" />
         </div>
         {!sidebarCollapsed && (
@@ -52,44 +76,35 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* ── Navigation (Telegram-style colored icons) ────── */}
+      {/* ── Navigation ───────────────────────────────────── */}
       <ScrollArea className="flex-1 py-3">
         <nav className="flex flex-col gap-1 px-3">
-          {NAV_SECTIONS.map((section) => {
-            const Icon = section.icon
-            const isActive = currentView === section.view
+          {navItems.map((item) => {
+            const Icon = item.icon
+            const isActive = currentView === item.view
 
             const button = (
               <button
-                key={section.view}
-                onClick={() => navigate(section.view)}
+                key={item.view}
+                onClick={() => navigate(item.view)}
                 className={`relative flex items-center gap-3 rounded-xl transition-all duration-200 ease-in-out ${
                   sidebarCollapsed
                     ? 'h-11 w-11 justify-center p-0 mx-auto'
                     : 'h-11 px-3 w-full'
                 } ${
                   isActive
-                    ? `${section.tintClass}`
+                    ? item.tint
                     : 'hover:bg-muted/60'
                 }`}
               >
-                {/* Colored circle with white icon — Telegram style */}
-                <div
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-200 ease-in-out ${
-                    sidebarCollapsed ? 'h-9 w-9' : 'h-8 w-8'
-                  } ${section.bgClass} ${
-                    isActive ? 'shadow-md' : 'shadow-sm opacity-80'
-                  }`}
-                >
-                  <Icon className="h-[16px] w-[16px] text-white" />
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${item.color} ${
+                  sidebarCollapsed ? 'h-9 w-9' : 'h-8 w-8'
+                } transition-all duration-200 ${isActive ? 'shadow-md' : 'shadow-sm opacity-75'}`}>
+                  <Icon className="h-4 w-4 text-white" />
                 </div>
                 {!sidebarCollapsed && (
-                  <span
-                    className={`truncate text-[13px] font-medium transition-colors duration-200 ${
-                      isActive ? 'text-foreground' : 'text-muted-foreground'
-                    }`}
-                  >
-                    {section.label}
+                  <span className={`truncate text-[13px] font-medium transition-colors duration-200 ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    {item.label}
                   </span>
                 )}
               </button>
@@ -97,10 +112,10 @@ export function Sidebar() {
 
             if (sidebarCollapsed) {
               return (
-                <Tooltip key={section.view}>
+                <Tooltip key={item.view}>
                   <TooltipTrigger asChild>{button}</TooltipTrigger>
                   <TooltipContent side="right" sideOffset={8}>
-                    {section.label}
+                    {item.label}
                   </TooltipContent>
                 </Tooltip>
               )
@@ -136,8 +151,8 @@ export function Sidebar() {
         {sidebarCollapsed ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Avatar className="h-9 w-9 cursor-default">
-                <AvatarFallback className="bg-gray-500 text-white text-xs font-semibold">
+              <Avatar className="h-9 w-9 cursor-default transition-transform duration-200 hover:scale-105">
+                <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
                   {userInitials}
                 </AvatarFallback>
               </Avatar>
@@ -149,7 +164,7 @@ export function Sidebar() {
         ) : (
           <>
             <Avatar className="h-9 w-9 shrink-0">
-              <AvatarFallback className="bg-gray-500 text-white text-xs font-semibold">
+              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
                 {userInitials}
               </AvatarFallback>
             </Avatar>
@@ -166,7 +181,7 @@ export function Sidebar() {
 
         <button
           onClick={logout}
-          className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-all duration-200 hover:bg-red-50 hover:text-red-500 hover:scale-105 ${
+          className={`shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-all duration-200 hover:bg-destructive/10 hover:text-destructive hover:scale-105 ${
             sidebarCollapsed ? '' : 'ml-auto'
           }`}
         >

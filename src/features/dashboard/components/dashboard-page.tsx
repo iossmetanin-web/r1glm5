@@ -190,8 +190,8 @@ export function DashboardPage() {
       value: totalDeals.toString(),
       subtitle: `${openDeals} откр. \u00B7 ${lostDeals} проигр.`,
       icon: Package,
-      iconBg: 'bg-primary/10',
-      iconColor: 'text-primary',
+      iconBg: 'bg-blue-500',
+      iconColor: 'text-white',
     },
     {
       title: 'Воронка',

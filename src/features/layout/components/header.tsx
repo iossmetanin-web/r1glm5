@@ -21,15 +21,24 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuthStore, useNavigationStore, useUIStore } from '@/lib/store'
-import { getSectionConfig } from '@/lib/section-colors'
+import type { AppView } from '@/lib/store'
 
-const viewTitles: Record<string, string> = {
+const viewTitles: Record<AppView, string> = {
   dashboard: 'Панель',
   deals: 'Сделки',
   'deal-detail': 'Детали сделки',
   contacts: 'Контакты',
   tasks: 'Задачи',
   settings: 'Настройки',
+}
+
+const viewColors: Record<AppView, string> = {
+  dashboard: 'bg-blue-500',
+  deals: 'bg-amber-500',
+  'deal-detail': 'bg-amber-500',
+  contacts: 'bg-emerald-500',
+  tasks: 'bg-violet-500',
+  settings: 'bg-gray-500',
 }
 
 export function Header() {
@@ -40,8 +49,6 @@ export function Header() {
   const goBack = useNavigationStore((s) => s.goBack)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
-
-  const section = getSectionConfig(currentView)
 
   const userInitials = currentUser?.name
     ? currentUser.name
@@ -55,15 +62,15 @@ export function Header() {
   return (
     <header
       className={`sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-border/60 bg-card/80 px-4 backdrop-blur-lg transition-[margin-left] duration-300 ease-in-out ${
-        sidebarCollapsed ? 'ml-[72px]' : 'ml-[248px]'
+        sidebarCollapsed ? 'ml-[68px]' : 'ml-[240px]'
       }`}
     >
       {/* ── Left Section ──────────────────────────────────── */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
+          className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/8 hover:text-foreground md:hidden"
           onClick={toggleSidebar}
         >
           <Menu className="h-4 w-4" />
@@ -73,16 +80,15 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/8 hover:text-foreground"
             onClick={goBack}
           >
             <span className="text-sm">&larr;</span>
           </Button>
         )}
 
-        {/* Section colored dot + title */}
         <div className="flex items-center gap-2">
-          <div className={`h-2 w-2 rounded-full ${section.bgClass}`} />
+          <div className={`h-2 w-2 rounded-full ${viewColors[currentView] ?? 'bg-gray-400'}`} />
           <h1 className="text-sm font-semibold tracking-tight text-foreground">
             {viewTitles[currentView] ?? 'PulseCRM'}
           </h1>
@@ -100,27 +106,27 @@ export function Header() {
           <Input
             type="search"
             placeholder="Поиск..."
-            className="h-9 w-56 rounded-lg border-border/50 bg-muted/40 pl-8 text-sm placeholder:text-muted-foreground/60 focus-visible:ring-ring/30 transition-all duration-200"
+            className="h-9 w-56 rounded-lg border-border/50 bg-muted/40 pl-8 text-sm placeholder:text-muted-foreground/60 focus-visible:ring-primary/30 transition-all duration-200"
           />
         </div>
 
         {/* New button */}
         <Button
-          size="sm"
-          className={`h-8 gap-1.5 rounded-lg ${section.bgClass} text-white shadow-sm hover:brightness-110 hover:scale-[1.02]`}
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/8 hover:text-foreground"
         >
-          <Plus className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline text-xs font-medium">Создать</span>
+          <Plus className="h-4 w-4" />
         </Button>
 
         {/* Notifications */}
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="relative h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/8 hover:text-foreground"
         >
           <Bell className="h-4 w-4" />
-          <Badge className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium leading-none text-white">
+          <Badge className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium leading-none text-primary-foreground">
             3
           </Badge>
         </Button>
@@ -130,10 +136,10 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="ml-1 h-8 gap-2 rounded-full pl-1 pr-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="ml-1 h-8 gap-2 rounded-full pl-1 pr-2 text-muted-foreground hover:bg-primary/8 hover:text-foreground"
             >
               <Avatar className="h-6 w-6">
-                <AvatarFallback className="bg-gray-500 text-white text-[10px] font-semibold">
+                <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
                   {userInitials}
                 </AvatarFallback>
               </Avatar>

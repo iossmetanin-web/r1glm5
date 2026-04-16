@@ -7,10 +7,6 @@ import {
   LogOut,
   Zap,
   Info,
-  Palette,
-  Globe,
-  Bell,
-  Lock,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,9 +14,6 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useAuthStore } from '@/lib/store'
-import { SECTION_COLORS } from '@/lib/section-colors'
-
-const section = SECTION_COLORS.settings
 
 export function SettingsPage() {
   const currentUser = useAuthStore((s) => s.currentUser)
@@ -44,10 +37,10 @@ export function SettingsPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* ── Profile ────────────────────────────────────────── */}
-      <Card className="rounded-2xl border-border/60 shadow-sm transition-all duration-200 hover:shadow-md">
+      <Card className="rounded-2xl border-border/60 shadow-sm transition-shadow duration-200 hover:shadow-md">
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2.5">
-            <div className={`flex h-7 w-7 items-center justify-center rounded-full ${section.bgClass}`}>
+          <CardTitle className="text-base flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gray-500">
               <User className="h-4 w-4 text-white" />
             </div>
             Профиль
@@ -56,8 +49,8 @@ export function SettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
-            <Avatar className="h-14 w-14 ring-2 ring-gray-200">
-              <AvatarFallback className="bg-gray-500 text-white text-lg font-semibold">
+            <Avatar className="h-14 w-14 ring-2 ring-primary/10">
+              <AvatarFallback className="bg-primary text-primary-foreground text-lg font-semibold">
                 {userInitials}
               </AvatarFallback>
             </Avatar>
@@ -75,7 +68,7 @@ export function SettingsPage() {
                 <Shield className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 <Badge
                   variant="secondary"
-                  className="text-xs bg-gray-100 text-gray-700 border-gray-200"
+                  className="text-xs bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
                 >
                   {roleLabel[currentUser?.role ?? ''] ?? currentUser?.role}
                 </Badge>
@@ -85,82 +78,19 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* ── Quick Settings Grid ───────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Notifications */}
-        <Card className="rounded-2xl border-border/60 shadow-sm transition-all duration-200 hover:shadow-md">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500">
-                <Bell className="h-5 w-5 text-white" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">Уведомления</p>
-                <p className="text-xs text-muted-foreground">Push и email</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Appearance */}
-        <Card className="rounded-2xl border-border/60 shadow-sm transition-all duration-200 hover:shadow-md">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500">
-                <Palette className="h-5 w-5 text-white" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">Внешний вид</p>
-                <p className="text-xs text-muted-foreground">Тема оформления</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Language */}
-        <Card className="rounded-2xl border-border/60 shadow-sm transition-all duration-200 hover:shadow-md">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500">
-                <Globe className="h-5 w-5 text-white" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">Язык</p>
-                <p className="text-xs text-muted-foreground">Русский</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Security */}
-        <Card className="rounded-2xl border-border/60 shadow-sm transition-all duration-200 hover:shadow-md">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500">
-                <Lock className="h-5 w-5 text-white" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">Безопасность</p>
-                <p className="text-xs text-muted-foreground">Пароль и 2FA</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* ── About ──────────────────────────────────────────── */}
-      <Card className="rounded-2xl border-border/60 shadow-sm transition-all duration-200 hover:shadow-md">
+      <Card className="rounded-2xl border-border/60 shadow-sm transition-shadow duration-200 hover:shadow-md">
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary">
-              <Info className="h-4 w-4 text-white" />
+          <CardTitle className="text-base flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary">
+              <Info className="h-4 w-4 text-primary-foreground" />
             </div>
             О приложении
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm shadow-primary/25">
               <Zap className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
@@ -175,7 +105,7 @@ export function SettingsPage() {
       <Separator />
       <Button
         variant="outline"
-        className="w-full rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200/60 transition-all duration-200"
+        className="w-full rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 transition-all duration-200"
         onClick={logout}
       >
         <LogOut className="mr-2 h-4 w-4" />

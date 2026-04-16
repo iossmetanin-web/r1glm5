@@ -313,7 +313,7 @@ export default function TasksPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-            <CheckSquare className="h-5 w-5 text-muted-foreground" />
+            <CheckSquare className="h-5 w-5 text-violet-500" />
             Задачи
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
