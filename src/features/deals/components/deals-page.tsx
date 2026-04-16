@@ -249,22 +249,22 @@ export default function DealsPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Filter Buttons */}
-          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-muted/60 rounded-xl p-1">
             {(['all', 'open', 'won', 'lost'] as FilterType[]).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                   filter === f
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'
                 }`}
               >
                 {f === 'all' ? 'Все' : f === 'open' ? 'Открытые' : f === 'won' ? 'Выигранные' : 'Проигранные'}
               </button>
             ))}
           </div>
-          <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
+          <Button size="sm" onClick={openCreateDialog} className="gap-1.5 rounded-xl">
             <Plus className="h-4 w-4" />
             Новая сделка
           </Button>
@@ -290,7 +290,7 @@ export default function DealsPage() {
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="min-w-[280px] flex-shrink-0 bg-muted/30 rounded-xl p-3"
+              className="min-w-[280px] flex-shrink-0 bg-muted/30 rounded-2xl p-3"
             >
               <div className="flex items-center gap-2 mb-3">
                 <Skeleton className="h-3 w-3 rounded-full" />
@@ -299,7 +299,7 @@ export default function DealsPage() {
               </div>
               <div className="space-y-2">
                 {Array.from({ length: 3 }).map((_, j) => (
-                  <Card key={j} className="border-l-4">
+                  <Card key={j} className="border-l-4 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md">
                     <CardContent className="p-3">
                       <Skeleton className="h-4 w-full" />
                       <Skeleton className="h-3 w-20 mt-2" />
@@ -327,7 +327,7 @@ export default function DealsPage() {
             return (
               <div
                 key={stage.id}
-                className="min-w-[280px] flex-shrink-0 bg-muted/30 rounded-xl p-3 flex flex-col"
+                className="min-w-[280px] flex-shrink-0 bg-primary/3 rounded-2xl p-3 flex flex-col"
               >
                 {/* Column Header */}
                 <div className="flex items-center gap-2 mb-1">
@@ -353,14 +353,14 @@ export default function DealsPage() {
                 <ScrollArea className="flex-1 max-h-[calc(100vh-240px)]">
                   <div className="space-y-2 pr-2">
                     {stageDeals.length === 0 && (
-                      <div className="flex items-center justify-center h-24 text-xs text-muted-foreground rounded-lg border border-dashed">
+                      <div className="flex items-center justify-center h-24 text-xs text-muted-foreground rounded-xl border border-dashed">
                         Пусто
                       </div>
                     )}
                     {stageDeals.map((deal) => (
                       <Card
                         key={deal.id}
-                        className="border-l-4 cursor-pointer transition-shadow hover:shadow-md bg-card"
+                        className="border-l-4 cursor-pointer rounded-xl shadow-sm transition-all duration-200 hover:shadow-md active:scale-[0.99] bg-card"
                         style={{
                           borderLeftColor: stage.color || '#888',
                         }}
@@ -553,6 +553,7 @@ export default function DealsPage() {
               <Button
                 onClick={handleCreateDeal}
                 disabled={!newTitle.trim() || creating}
+                className="rounded-xl"
               >
                 {creating ? 'Создание...' : 'Создать сделку'}
               </Button>

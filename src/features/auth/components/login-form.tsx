@@ -27,19 +27,19 @@ export function LoginForm() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     )
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-sm border-border/50 bg-card/80 backdrop-blur-sm">
+      <Card className="w-full max-w-sm rounded-2xl border-border/60 bg-card shadow-lg shadow-black/[0.03]">
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary shadow-md shadow-primary/25 transition-transform duration-200 hover:scale-105">
             <Zap className="h-6 w-6 text-primary-foreground" />
           </div>
-          <CardTitle className="text-xl font-semibold tracking-tight">
+          <CardTitle className="text-xl font-bold tracking-tight">
             PulseCRM
           </CardTitle>
           <CardDescription className="text-sm text-muted-foreground">
@@ -52,10 +52,10 @@ export function LoginForm() {
               <button
                 key={user.id}
                 onClick={() => login(user)}
-                className="flex w-full items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 text-left transition-all hover:bg-accent hover:border-accent-foreground/20"
+                className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-4 py-3 text-left transition-all duration-200 hover:bg-primary/5 hover:border-primary/20 hover:shadow-sm hover:scale-[1.01] active:scale-[0.99]"
               >
                 <Avatar className="h-9 w-9">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-medium">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
                     {user.name.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -63,7 +63,7 @@ export function LoginForm() {
                   <p className="text-sm font-medium truncate">{user.name}</p>
                   <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                 </div>
-                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 px-1.5 py-0.5 rounded bg-muted">
+                <span className="text-[10px] uppercase font-medium text-muted-foreground/70 px-1.5 py-0.5 rounded-md bg-muted">
                   {user.role}
                 </span>
               </button>

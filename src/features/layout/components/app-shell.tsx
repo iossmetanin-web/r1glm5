@@ -27,7 +27,7 @@ export function AppShell({ children }: AppShellProps) {
   if (!hydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
       </div>
     )
   }
@@ -36,7 +36,7 @@ export function AppShell({ children }: AppShellProps) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
       </div>
     )
   }
@@ -54,8 +54,8 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Main content area */}
       <div
-        className={`flex min-h-screen flex-col transition-[margin-left] duration-300 md:ml-0 ${
-          sidebarCollapsed ? 'md:ml-16' : 'md:ml-60'
+        className={`flex min-h-screen flex-col transition-[margin-left] duration-300 ease-in-out ${
+          sidebarCollapsed ? 'md:ml-[68px]' : 'md:ml-[240px]'
         }`}
       >
         {/* Header: hidden on mobile (md:flex), visible on desktop */}
@@ -63,13 +63,13 @@ export function AppShell({ children }: AppShellProps) {
           <Header />
         </div>
 
-        {/* Page content: extra bottom padding on mobile for nav bar */}
+        {/* Page content: extra bottom padding on mobile for bottom nav */}
         <main className="flex-1 p-4 pb-24 md:p-6 md:pb-6">
           {children}
         </main>
       </div>
 
-      {/* Bottom navigation: visible only on mobile */}
+      {/* Bottom navigation: visible ONLY on mobile, ALWAYS present */}
       <MobileNav />
     </div>
   )

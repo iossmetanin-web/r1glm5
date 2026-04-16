@@ -322,15 +322,15 @@ export default function TasksPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Status Tabs */}
-          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-muted/60 rounded-xl p-1">
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab.value}
                 onClick={() => setActiveTab(tab.value)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
                   activeTab === tab.value
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'
                 }`}
               >
                 {tab.label}
@@ -340,7 +340,7 @@ export default function TasksPage() {
               </button>
             ))}
           </div>
-          <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
+          <Button size="sm" onClick={openCreateDialog} className="gap-1.5 rounded-xl">
             <Plus className="h-4 w-4" />
             Добавить задачу
           </Button>
@@ -364,7 +364,7 @@ export default function TasksPage() {
       {loading && (
         <div className="space-y-3">
           {Array.from({ length: 5 }).map((_, i) => (
-            <Card key={i} className="border border-border">
+            <Card key={i} className="rounded-xl shadow-sm border border-border/60 transition-all duration-200 hover:shadow-md">
               <CardContent className="p-4 flex items-start gap-3">
                 <Skeleton className="h-5 w-5 rounded-[4px] mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0 space-y-2">
@@ -384,7 +384,7 @@ export default function TasksPage() {
       {/* ── Empty State ────────────────────────────────────────────────────── */}
       {!loading && !error && tasks.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <div className="h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center">
+          <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
             <CheckSquare className="h-7 w-7 text-muted-foreground" />
           </div>
           <div className="text-center">
@@ -393,7 +393,7 @@ export default function TasksPage() {
               Создайте первую задачу
             </p>
           </div>
-          <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
+          <Button size="sm" onClick={openCreateDialog} className="gap-1.5 rounded-xl">
             <Plus className="h-4 w-4" />
             Добавить задачу
           </Button>
@@ -419,7 +419,7 @@ export default function TasksPage() {
 
       {/* ── Task List ──────────────────────────────────────────────────────── */}
       {!loading && !error && filteredTasks.length > 0 && (
-        <div className="space-y-3 flex-1 overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
+        <div className="space-y-3 flex-1 overflow-y-auto max-h-[calc(100vh-260px)] pr-1">
           {filteredTasks.map((task) => {
             const isDone = task.status === 'done'
             const priority = (task.priority as TaskPriority) || 'medium'
@@ -428,7 +428,7 @@ export default function TasksPage() {
             return (
               <Card
                 key={task.id}
-                className="border border-border transition-colors hover:bg-accent/50"
+                className="rounded-xl border border-border/60 shadow-sm transition-all duration-200 hover:shadow-md hover:bg-primary/5"
               >
                 <CardContent className="p-4 flex items-start gap-3">
                   {/* Checkbox */}
@@ -477,7 +477,7 @@ export default function TasksPage() {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
-                              className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                              className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-colors"
                               aria-label="Действия с задачей"
                             >
                               <MoreHorizontal className="h-4 w-4" />
@@ -633,6 +633,7 @@ export default function TasksPage() {
               <Button
                 onClick={handleSave}
                 disabled={!form.title.trim() || saving}
+                className="rounded-xl"
               >
                 {saving
                   ? 'Сохранение...'

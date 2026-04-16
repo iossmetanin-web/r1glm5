@@ -259,7 +259,7 @@ export function DashboardPage() {
         {/* Stats row skeleton */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="transition-shadow hover:shadow-md">
+            <Card key={i} className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <Skeleton className="h-4 w-24" />
                 <Skeleton className="h-8 w-8 rounded-lg" />
@@ -275,7 +275,7 @@ export function DashboardPage() {
         {/* Charts skeleton */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {Array.from({ length: 2 }).map((_, i) => (
-            <Card key={i}>
+            <Card key={i} className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
               <CardHeader>
                 <Skeleton className="h-5 w-36" />
               </CardHeader>
@@ -289,7 +289,7 @@ export function DashboardPage() {
         {/* Bottom section skeleton */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {Array.from({ length: 2 }).map((_, i) => (
-            <Card key={i}>
+            <Card key={i} className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
               <CardHeader>
                 <Skeleton className="h-5 w-32" />
               </CardHeader>
@@ -314,7 +314,7 @@ export function DashboardPage() {
   // Error state
   if (error) {
     return (
-      <Card className="flex flex-col items-center justify-center py-16">
+      <Card className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md flex flex-col items-center justify-center py-16">
         <AlertCircle className="mb-4 h-10 w-10 text-destructive" />
         <h3 className="mb-1 text-lg font-semibold text-foreground">
           Что-то пошло не так
@@ -322,7 +322,7 @@ export function DashboardPage() {
         <p className="mb-4 text-sm text-muted-foreground">{error}</p>
         <button
           onClick={fetchData}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          className="inline-flex items-center gap-2 rounded-xl shadow-sm shadow-primary/25 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <TrendingUp className="h-4 w-4" />
           Попробовать снова
@@ -340,7 +340,7 @@ export function DashboardPage() {
           return (
             <Card
               key={card.title}
-              className="transition-shadow hover:shadow-md"
+              className="rounded-2xl shadow-sm transition-all duration-200 hover:shadow-md hover:scale-[1.01]"
             >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <span className="text-sm font-medium text-muted-foreground">
@@ -368,7 +368,7 @@ export function DashboardPage() {
       {/* ── Charts Section ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Bar Chart — Deals by Stage */}
-        <Card>
+        <Card className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
           <CardHeader>
             <CardTitle className="text-base">Сделки по этапам</CardTitle>
           </CardHeader>
@@ -406,7 +406,7 @@ export function DashboardPage() {
         </Card>
 
         {/* Pie Chart — Deal Status Distribution */}
-        <Card>
+        <Card className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
           <CardHeader>
             <CardTitle className="text-base">
               Статус сделок
@@ -472,7 +472,7 @@ export function DashboardPage() {
       {/* ── Bottom Section ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Recent Deals */}
-        <Card>
+        <Card className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
           <CardHeader>
             <CardTitle className="text-base">Последние сделки</CardTitle>
           </CardHeader>
@@ -488,7 +488,7 @@ export function DashboardPage() {
                     <button
                       key={deal.id}
                       onClick={() => openDeal(deal.id)}
-                      className="flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors hover:bg-accent"
+                      className="flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors hover:bg-primary/5"
                     >
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-foreground">
@@ -520,7 +520,7 @@ export function DashboardPage() {
         </Card>
 
         {/* Activity Feed */}
-        <Card>
+        <Card className="rounded-2xl shadow-sm transition-shadow duration-200 hover:shadow-md">
           <CardHeader>
             <CardTitle className="text-base">Лента активности</CardTitle>
           </CardHeader>
@@ -541,7 +541,7 @@ export function DashboardPage() {
                         key={activity.id}
                         className="flex items-start gap-3 rounded-lg p-3"
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                           <Icon className="h-4 w-4 text-muted-foreground" />
                         </div>
                         <div className="min-w-0 flex-1">

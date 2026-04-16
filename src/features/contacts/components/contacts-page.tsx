@@ -47,10 +47,10 @@ interface ContactFormData {
 const STAGE_OPTIONS: ContactStage[] = ['Лид', 'Переговоры', 'Клиент', 'Отток']
 
 const STAGE_BADGE_MAP: Record<string, { cls: string }> = {
-  'лид': { cls: 'bg-muted text-muted-foreground hover:bg-muted/80' },
-  'переговоры': { cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 border-amber-500/25' },
-  'клиент': { cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/25' },
-  'отток': { cls: 'bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/20 border-red-500/25' },
+  'лид': { cls: 'bg-muted text-muted-foreground border-transparent' },
+  'переговоры': { cls: 'bg-amber-500/10 text-amber-600 border-transparent' },
+  'клиент': { cls: 'bg-emerald-500/10 text-emerald-600 border-transparent' },
+  'отток': { cls: 'bg-red-500/10 text-red-600 border-transparent' },
 }
 
 const EMPTY_FORM: ContactFormData = {
@@ -274,10 +274,10 @@ export default function ContactsPage() {
               placeholder="Поиск контактов…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 w-full sm:w-[220px] h-9"
+              className="pl-8 w-full sm:w-[220px] h-9 rounded-xl"
             />
           </div>
-          <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
+          <Button size="sm" onClick={openCreateDialog} className="gap-1.5 rounded-xl">
             <Plus className="h-4 w-4" />
             Добавить контакт
           </Button>
@@ -327,7 +327,7 @@ export default function ContactsPage() {
               Добавьте первый контакт, чтобы начать
             </p>
           </div>
-          <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
+          <Button size="sm" onClick={openCreateDialog} className="gap-1.5 rounded-xl">
             <Plus className="h-4 w-4" />
             Добавить контакт
           </Button>
@@ -353,11 +353,11 @@ export default function ContactsPage() {
 
       {/* ── Table ──────────────────────────────────────────────────────────── */}
       {!loading && !error && filteredContacts.length > 0 && (
-        <div className="border border-border rounded-lg overflow-hidden flex-1">
+        <div className="border border-border/60 rounded-2xl shadow-sm overflow-hidden flex-1">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead className="pl-4">Имя</TableHead>
                   <TableHead>Компания</TableHead>
                   <TableHead>Телефон</TableHead>
@@ -369,7 +369,7 @@ export default function ContactsPage() {
               </TableHeader>
               <TableBody>
                 {filteredContacts.map((contact) => (
-                  <TableRow key={contact.id} className="hover:bg-accent/50">
+                  <TableRow key={contact.id} className="hover:bg-primary/5">
                     <TableCell className="pl-4 font-medium text-foreground">
                       {contact.name}
                     </TableCell>
@@ -397,14 +397,14 @@ export default function ContactsPage() {
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => openEditDialog(contact)}
-                          className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                          className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-colors"
                           aria-label={`Редактировать ${contact.name}`}
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => handleDelete(contact)}
-                          className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:scale-105 transition-colors"
                           aria-label={`Удалить ${contact.name}`}
                         >
                           <Trash2 className="h-3.5 w-3.5" />

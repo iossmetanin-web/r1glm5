@@ -1,7 +1,13 @@
 'use client'
 
-import { useTheme } from 'next-themes'
-import { Search, Moon, Sun, Bell, Plus, Menu, Settings, LogOut } from 'lucide-react'
+import {
+  Search,
+  Bell,
+  Plus,
+  Menu,
+  Settings,
+  LogOut,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -27,7 +33,6 @@ const viewTitles: Record<AppView, string> = {
 }
 
 export function Header() {
-  const { setTheme, resolvedTheme } = useTheme()
   const currentUser = useAuthStore((s) => s.currentUser)
   const logout = useAuthStore((s) => s.logout)
   const currentView = useNavigationStore((s) => s.currentView)
@@ -47,8 +52,8 @@ export function Header() {
 
   return (
     <header
-      className={`sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-border bg-background/80 px-4 backdrop-blur-md transition-[margin-left] duration-300 ${
-        sidebarCollapsed ? 'ml-16' : 'ml-60'
+      className={`sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-border/60 bg-card/80 px-4 backdrop-blur-lg transition-[margin-left] duration-300 ease-in-out ${
+        sidebarCollapsed ? 'ml-[68px]' : 'ml-[240px]'
       }`}
     >
       {/* ── Left Section ──────────────────────────────────── */}
@@ -56,7 +61,7 @@ export function Header() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-muted-foreground hover:bg-accent hover:text-accent-foreground md:hidden"
+          className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/8 hover:text-foreground md:hidden"
           onClick={toggleSidebar}
         >
           <Menu className="h-4 w-4" />
@@ -66,7 +71,7 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/8 hover:text-foreground"
             onClick={goBack}
           >
             <span className="text-sm">&larr;</span>
@@ -89,7 +94,7 @@ export function Header() {
           <Input
             type="search"
             placeholder="Поиск..."
-            className="h-8 w-56 border-border/50 bg-muted/40 pl-8 text-sm placeholder:text-muted-foreground/60 focus-visible:ring-ring/40"
+            className="h-9 w-56 rounded-lg border-border/50 bg-muted/40 pl-8 text-sm placeholder:text-muted-foreground/60 focus-visible:ring-primary/30 transition-all duration-200"
           />
         </div>
 
@@ -97,33 +102,19 @@ export function Header() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/8 hover:text-foreground"
         >
           <Plus className="h-4 w-4" />
-        </Button>
-
-        {/* Theme toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-          onClick={() =>
-            setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
-          }
-        >
-          <Sun className="h-4 w-4 scale-100 rotate-0 transition-transform dark:scale-0 dark:-rotate-90" />
-          <Moon className="absolute h-4 w-4 scale-0 rotate-90 transition-transform dark:scale-100 dark:rotate-0" />
-          <span className="sr-only">Переключить тему</span>
         </Button>
 
         {/* Notifications */}
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-8 w-8 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          className="relative h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/8 hover:text-foreground"
         >
           <Bell className="h-4 w-4" />
-          <Badge className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-medium leading-none">
+          <Badge className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium leading-none text-primary-foreground">
             3
           </Badge>
         </Button>
@@ -133,10 +124,10 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="ml-1 h-8 gap-2 rounded-full pl-1 pr-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              className="ml-1 h-8 gap-2 rounded-full pl-1 pr-2 text-muted-foreground hover:bg-primary/8 hover:text-foreground"
             >
               <Avatar className="h-6 w-6">
-                <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-medium">
+                <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-semibold">
                   {userInitials}
                 </AvatarFallback>
               </Avatar>

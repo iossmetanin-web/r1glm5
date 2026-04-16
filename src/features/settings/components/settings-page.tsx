@@ -1,13 +1,9 @@
 'use client'
 
-import { useTheme } from 'next-themes'
 import {
   User,
   Mail,
   Shield,
-  Sun,
-  Moon,
-  Monitor,
   LogOut,
   Zap,
   Info,
@@ -17,17 +13,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select'
 import { useAuthStore } from '@/lib/store'
 
 export function SettingsPage() {
-  const { setTheme, theme, resolvedTheme } = useTheme()
   const currentUser = useAuthStore((s) => s.currentUser)
   const logout = useAuthStore((s) => s.logout)
 
@@ -49,17 +37,19 @@ export function SettingsPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* ── Profile ────────────────────────────────────────── */}
-      <Card>
+      <Card className="rounded-2xl border-border/60 shadow-sm transition-shadow duration-200 hover:shadow-md">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <User className="h-4 w-4 text-muted-foreground" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+              <User className="h-4 w-4 text-primary" />
+            </div>
             Профиль
           </CardTitle>
           <CardDescription>Информация о вашем аккаунте</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
-            <Avatar className="h-14 w-14">
+            <Avatar className="h-14 w-14 ring-2 ring-primary/10">
               <AvatarFallback className="bg-primary text-primary-foreground text-lg font-semibold">
                 {userInitials}
               </AvatarFallback>
@@ -68,15 +58,18 @@ export function SettingsPage() {
               <p className="text-base font-semibold text-foreground truncate">
                 {currentUser?.name ?? 'Пользователь'}
               </p>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-1.5">
                 <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 <p className="text-sm text-muted-foreground truncate">
                   {currentUser?.email ?? ''}
                 </p>
               </div>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-1.5">
                 <Shield className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <Badge variant="secondary" className="text-xs">
+                <Badge
+                  variant="secondary"
+                  className="text-xs bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
+                >
                   {roleLabel[currentUser?.role ?? ''] ?? currentUser?.role}
                 </Badge>
               </div>
@@ -85,129 +78,23 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* ── Appearance ─────────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Sun className="h-4 w-4 text-muted-foreground" />
-            Внешний вид
-          </CardTitle>
-          <CardDescription>Настройте тему приложения</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                {resolvedTheme === 'dark' ? (
-                  <Moon className="h-4 w-4 text-foreground" />
-                ) : (
-                  <Sun className="h-4 w-4 text-foreground" />
-                )}
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">Тема</p>
-                <p className="text-xs text-muted-foreground">
-                  {resolvedTheme === 'dark' ? 'Тёмная' : 'Светлая'}
-                </p>
-              </div>
-            </div>
-            <Select value={theme ?? 'system'} onValueChange={setTheme}>
-              <SelectTrigger className="w-[140px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="light">
-                  <span className="flex items-center gap-2">
-                    <Sun className="h-3.5 w-3.5" />
-                    Светлая
-                  </span>
-                </SelectItem>
-                <SelectItem value="dark">
-                  <span className="flex items-center gap-2">
-                    <Moon className="h-3.5 w-3.5" />
-                    Тёмная
-                  </span>
-                </SelectItem>
-                <SelectItem value="system">
-                  <span className="flex items-center gap-2">
-                    <Monitor className="h-3.5 w-3.5" />
-                    Системная
-                  </span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Quick Theme Toggle Buttons ─────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Monitor className="h-4 w-4 text-muted-foreground" />
-            Быстрое переключение
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-3">
-            <button
-              onClick={() => setTheme('light')}
-              className={`flex flex-col items-center gap-2 rounded-xl border p-4 transition-all hover:bg-accent ${
-                resolvedTheme === 'light'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border'
-              }`}
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-500/20">
-                <Sun className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              </div>
-              <span className="text-xs font-medium text-foreground">Светлая</span>
-            </button>
-            <button
-              onClick={() => setTheme('dark')}
-              className={`flex flex-col items-center gap-2 rounded-xl border p-4 transition-all hover:bg-accent ${
-                resolvedTheme === 'dark'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border'
-              }`}
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-500/20">
-                <Moon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-              </div>
-              <span className="text-xs font-medium text-foreground">Тёмная</span>
-            </button>
-            <button
-              onClick={() => setTheme('system')}
-              className={`flex flex-col items-center gap-2 rounded-xl border p-4 transition-all hover:bg-accent ${
-                theme === 'system'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border'
-              }`}
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                <Monitor className="h-5 w-5 text-foreground" />
-              </div>
-              <span className="text-xs font-medium text-foreground">Системная</span>
-            </button>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* ── About ──────────────────────────────────────────── */}
-      <Card>
+      <Card className="rounded-2xl border-border/60 shadow-sm transition-shadow duration-200 hover:shadow-md">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Info className="h-4 w-4 text-muted-foreground" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10">
+              <Info className="h-4 w-4 text-primary" />
+            </div>
             О приложении
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-              <Zap className="h-4 w-4 text-primary-foreground" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm shadow-primary/25">
+              <Zap className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground">PulseCRM</p>
+              <p className="text-sm font-semibold text-foreground">PulseCRM</p>
               <p className="text-xs text-muted-foreground">v0.3.0</p>
             </div>
           </div>
@@ -218,7 +105,7 @@ export function SettingsPage() {
       <Separator />
       <Button
         variant="outline"
-        className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+        className="w-full rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 transition-all duration-200"
         onClick={logout}
       >
         <LogOut className="mr-2 h-4 w-4" />
