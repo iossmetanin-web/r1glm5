@@ -18,12 +18,12 @@ import { useAuthStore, useNavigationStore, useUIStore } from '@/lib/store'
 import type { AppView } from '@/lib/store'
 
 const viewTitles: Record<AppView, string> = {
-  dashboard: 'Dashboard',
-  deals: 'Deals',
-  'deal-detail': 'Deal Details',
-  contacts: 'Contacts',
-  tasks: 'Tasks',
-  settings: 'Settings',
+  dashboard: 'Панель',
+  deals: 'Сделки',
+  'deal-detail': 'Детали сделки',
+  contacts: 'Контакты',
+  tasks: 'Задачи',
+  settings: 'Настройки',
 }
 
 export function Header() {
@@ -88,7 +88,7 @@ export function Header() {
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Search..."
+            placeholder="Поиск..."
             className="h-8 w-56 border-border/50 bg-muted/40 pl-8 text-sm placeholder:text-muted-foreground/60 focus-visible:ring-ring/40"
           />
         </div>
@@ -113,7 +113,7 @@ export function Header() {
         >
           <Sun className="h-4 w-4 scale-100 rotate-0 transition-transform dark:scale-0 dark:-rotate-90" />
           <Moon className="absolute h-4 w-4 scale-0 rotate-90 transition-transform dark:scale-100 dark:rotate-0" />
-          <span className="sr-only">Toggle theme</span>
+          <span className="sr-only">Переключить тему</span>
         </Button>
 
         {/* Notifications */}
@@ -141,24 +141,24 @@ export function Header() {
                 </AvatarFallback>
               </Avatar>
               <span className="hidden text-xs font-medium sm:inline">
-                {currentUser?.name ?? 'User'}
+                {currentUser?.name ?? 'Пользователь'}
               </span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuLabel className="text-xs">
-              <p className="font-medium">{currentUser?.name ?? 'User'}</p>
+              <p className="font-medium">{currentUser?.name ?? 'Пользователь'}</p>
               <p className="text-muted-foreground">{currentUser?.email ?? ''}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => navigate('settings')}>
               <Settings className="mr-2 h-3.5 w-3.5" />
-              Settings
+              Настройки
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={logout}>
               <LogOut className="mr-2 h-3.5 w-3.5" />
-              Log out
+              Выйти
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
