@@ -213,7 +213,7 @@ export function ProposalsPage() {
 
       // Companies lookup — optional (used for displaying company names)
       try {
-        const res = await supabase.from('companies').select('id, name, inn, city').order('name')
+        const res = await supabase.from('companies').select('id, name, inn, city').is('deleted_at', 'is', null).order('name')
         if (!res.error) companiesData = res.data ?? []
       } catch { /* companies lookup optional */ }
 

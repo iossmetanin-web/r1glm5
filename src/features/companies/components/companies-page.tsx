@@ -155,19 +155,16 @@ function pluralizeCompanies(n: number): string {
 interface TagItem { id: string; name: string; color: string }
 interface SegmentItem { id: string; name: string }
 
-const SETTINGS_TAGS_ID = '00000001-0000-0000-0000-000000000001'
-
 async function loadTags(): Promise<TagItem[]> {
   try {
     const { data } = await supabase
-      .from('activities')
-      .select('content')
-      .eq('id', SETTINGS_TAGS_ID)
-      .eq('type', 'settings')
+      .from('settings')
+      .select('value')
+      .eq('category', 'tags')
+      .eq('key_name', 'tags_list')
       .single()
-    if (!data?.content) return []
-    try { return JSON.parse(data.content) as TagItem[] }
-    catch { return [] }
+    if (!data?.value) return []
+    return (data.value as TagItem[]) ?? []
   } catch { return [] }
 }
 
@@ -203,18 +200,16 @@ async function removeCompanyTag(companyId: string, tagName: string) {
 
 // ─── Segment helpers ──────────────────────────────────────────────────────────
 
-const SETTINGS_SEGMENTS_ID = '00000001-0000-0000-0000-000000000002'
-
 async function loadSegments(): Promise<SegmentItem[]> {
   try {
     const { data } = await supabase
-      .from('activities')
-      .select('content')
-      .eq('id', SETTINGS_SEGMENTS_ID)
-      .eq('type', 'settings')
+      .from('settings')
+      .select('value')
+      .eq('category', 'segments')
+      .eq('key_name', 'segments_list')
       .single()
-    if (!data?.content) return []
-    return JSON.parse(data.content)
+    if (!data?.value) return []
+    return (data.value as SegmentItem[]) ?? []
   } catch { return [] }
 }
 
@@ -323,6 +318,7 @@ export function CompaniesPage() {
         const res = await supabase
           .from('companies')
           .select('*')
+          .is('deleted_at', 'is', null)
           .order('created_at', { ascending: false })
         if (res.error) throw res.error
         companiesData = (res.data as CompanyWithManager[]) ?? []
@@ -476,6 +472,7 @@ export function CompaniesPage() {
           .from('companies')
           .select('id, name, inn')
           .eq('inn', inn.trim())
+          .is('deleted_at', 'is', null)
           .limit(1)
 
         if (existing && existing.length > 0 && existing[0].id !== excludeId) {

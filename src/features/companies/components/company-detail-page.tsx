@@ -16,6 +16,7 @@ import type {
   TaskInsert,
   Deal,
   PipelineStage,
+  User as UserType,
   COMPANY_SOURCES,
   COMPANY_STATUSES,
   ACTIVITY_TYPES,
@@ -296,8 +297,11 @@ export function CompanyDetailPage() {
     description: '',
     priority: 'medium' as string,
     deadline: '',
+    deal_id: '',
+    assigned_to: '',
   })
   const [savingTask, setSavingTask] = useState(false)
+  const [taskUsers, setTaskUsers] = useState<UserType[]>([])
 
   // Files state
   const [files, setFiles] = useState<{ name: string; id: string; created_at: string; metadata: Record<string, unknown> }[]>([])
@@ -320,7 +324,7 @@ export function CompanyDetailPage() {
 
     // Company query — critical
     try {
-      const res = await supabase.from('companies').select('*').eq('id', companyId).single()
+      const res = await supabase.from('companies').select('*').eq('id', companyId).is('deleted_at', 'is', null).single()
       if (res.error) throw res.error
       companyData = res.data
     } catch (err: unknown) {
@@ -460,10 +464,33 @@ export function CompanyDetailPage() {
     if (!companyId) return
     setDeleting(true)
     try {
-      await supabase.from('companies').delete().eq('id', companyId)
+      // Soft-delete the company
+      await supabase.from('companies').update({ deleted_at: new Date().toISOString() }).eq('id', companyId)
+
+      // Cascade: hard-delete related child records
+      await Promise.allSettled([
+        supabase.from('company_contacts').delete().eq('company_id', companyId),
+        supabase.from('activities').delete().eq('company_id', companyId),
+        supabase.from('deals').delete().eq('client_id', companyId),
+        supabase.from('tasks').delete().eq('company_id', companyId),
+      ])
+
+      // Clean up proposals + their items
+      const { data: companyProposals } = await supabase.from('proposals').select('id').eq('company_id', companyId)
+      if (companyProposals && companyProposals.length > 0) {
+        const proposalIds = companyProposals.map((p) => p.id)
+        await Promise.allSettled([
+          supabase.from('proposal_items').delete().in('proposal_id', proposalIds),
+          supabase.from('proposals').delete().eq('company_id', companyId),
+        ])
+      }
+
+      toast.success('Компания и связанные данные удалены')
       setDeleteOpen(false)
       goBack()
-    } catch { /* silent */ }
+    } catch {
+      toast.error('Ошибка при удалении компании')
+    }
     setDeleting(false)
   }
 
@@ -673,8 +700,12 @@ export function CompanyDetailPage() {
   // ─── Task CRUD ────────────────────────────────────────────────────────────
 
   const openAddTask = () => {
-    setTaskForm({ title: '', description: '', priority: 'medium', deadline: '' })
+    setTaskForm({ title: '', description: '', priority: 'medium', deadline: '', deal_id: '', assigned_to: '' })
     setTaskDialogOpen(true)
+    // Load users for assignment
+    supabase.from('users').select('id, name').then((res) => {
+      if (!res.error && res.data) setTaskUsers(res.data)
+    }).catch(() => {})
   }
 
   const handleSaveTask = async () => {
@@ -688,6 +719,8 @@ export function CompanyDetailPage() {
         priority: taskForm.priority,
         deadline: taskForm.deadline || null,
         company_id: companyId,
+        deal_id: taskForm.deal_id || null,
+        assigned_to: taskForm.assigned_to || null,
         created_by: currentUser?.id,
       } as TaskInsert)
       setTaskDialogOpen(false)
@@ -722,7 +755,7 @@ export function CompanyDetailPage() {
       type: 'заметка',
       user_id: currentUser?.id ?? null,
       company_id: companyId ?? undefined,
-    } as any)
+    } as ActivityInsert)
     refresh()
   }
 
@@ -736,7 +769,7 @@ export function CompanyDetailPage() {
       type: 'заметка',
       user_id: currentUser?.id ?? null,
       company_id: companyId ?? undefined,
-    } as any)
+    } as ActivityInsert)
     refresh()
   }
 
@@ -1471,6 +1504,18 @@ export function CompanyDetailPage() {
                               {formatDateShort(task.deadline)}
                             </span>
                           )}
+                          {task.deal_id && (() => {
+                            const deal = companyDeals.find((d) => d.id === task.deal_id)
+                            return deal ? (
+                              <Badge variant="outline" className="text-[10px] border-amber-300 bg-amber-500/10 text-amber-600">{deal.title}</Badge>
+                            ) : null
+                          })()}
+                          {task.assigned_to && taskUsers.length > 0 && (() => {
+                            const user = taskUsers.find((u) => u.id === task.assigned_to)
+                            return user ? (
+                              <span className="text-[10px] text-muted-foreground">→ {user.name}</span>
+                            ) : null
+                          })()}
                         </div>
                       </div>
                       <button
@@ -1952,7 +1997,7 @@ export function CompanyDetailPage() {
       ═══════════════════════════════════════════════════════════════════════ */}
       <Dialog open={taskDialogOpen} onOpenChange={(open) => {
         setTaskDialogOpen(open)
-        if (!open) setTaskForm({ title: '', description: '', priority: 'medium', deadline: '' })
+        if (!open) setTaskForm({ title: '', description: '', priority: 'medium', deadline: '', deal_id: '', assigned_to: '' })
       }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1986,6 +2031,28 @@ export function CompanyDetailPage() {
                 <Label htmlFor="task-deadline">Срок</Label>
                 <Input id="task-deadline" type="date" value={taskForm.deadline} onChange={(e) => setTaskForm((f) => ({ ...f, deadline: e.target.value }))} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Сделка</Label>
+              <Select value={taskForm.deal_id} onValueChange={(v) => setTaskForm((f) => ({ ...f, deal_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Выберите сделку (необязательно)" /></SelectTrigger>
+                <SelectContent>
+                  {companyDeals.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Исполнитель</Label>
+              <Select value={taskForm.assigned_to} onValueChange={(v) => setTaskForm((f) => ({ ...f, assigned_to: v }))}>
+                <SelectTrigger><SelectValue placeholder="Выберите исполнителя (необязательно)" /></SelectTrigger>
+                <SelectContent>
+                  {taskUsers.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setTaskDialogOpen(false)}>Отмена</Button>

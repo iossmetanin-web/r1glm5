@@ -15,6 +15,7 @@ import type {
   CommentInsert,
   Deal,
   PipelineStage,
+  User as UserType,
 } from '@/lib/supabase/database.types'
 import { useAuthStore, useNavigationStore } from '@/lib/store'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -185,8 +186,9 @@ export function WorkspacePage() {
 
   // Task dialog
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
-  const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'medium', deadline: getTodayStr() })
+  const [taskForm, setTaskForm] = useState({ title: '', description: '', priority: 'medium', deadline: getTodayStr(), deal_id: '', assigned_to: '' })
   const [savingTask, setSavingTask] = useState(false)
+  const [taskUsers, setTaskUsers] = useState<UserType[]>([])
 
   // Comment input
   const [commentText, setCommentText] = useState('')
@@ -210,6 +212,7 @@ export function WorkspacePage() {
         const { data, error } = await supabase
           .from('companies')
           .select('*')
+          .is('deleted_at', 'is', null)
           .order('name')
         if (cancelled) return
         if (error) {
@@ -250,7 +253,7 @@ export function WorkspacePage() {
     let cancelled = false
     async function loadDetails() {
       const results = await Promise.allSettled([
-        supabase.from('companies').select('*').eq('id', selectedId).single(),
+        supabase.from('companies').select('*').eq('id', selectedId).is('deleted_at', 'is', null).single(),
         supabase.from('company_contacts').select('*').eq('company_id', selectedId).order('is_primary', { ascending: false }),
         supabase.from('tasks').select('*').eq('company_id', selectedId).order('created_at', { ascending: false }),
         supabase.from('proposals').select('*').eq('company_id', selectedId).order('created_at', { ascending: false }),
@@ -292,17 +295,16 @@ export function WorkspacePage() {
       const filesResult = await supabase.storage.from('crm-files').list(selectedId, { sortBy: { column: 'created_at', order: 'desc' } })
       if (!cancelled) setFiles(filesResult.data ?? [])
 
-      // Load company tags
+      // Load company tags from settings table
       try {
-        const SETTINGS_TAGS_ID = '00000001-0000-0000-0000-000000000001'
         const { data: settingsData } = await supabase
-          .from('activities')
-          .select('content')
-          .eq('id', SETTINGS_TAGS_ID)
-          .eq('type', 'settings')
+          .from('settings')
+          .select('value')
+          .eq('category', 'tags')
+          .eq('key_name', 'tags_list')
           .single()
-        if (settingsData?.content && !cancelled) {
-          try { setAllTags(JSON.parse(settingsData.content)) } catch { /* ignore */ }
+        if (settingsData?.value && !cancelled) {
+          setAllTags(settingsData.value as typeof allTags)
         }
       } catch { /* ignore */ }
 
@@ -388,6 +390,8 @@ export function WorkspacePage() {
         priority: taskForm.priority,
         deadline: taskForm.deadline,
         company_id: selectedId,
+        deal_id: taskForm.deal_id || null,
+        assigned_to: taskForm.assigned_to || null,
         created_by: currentUser?.id,
       } as TaskInsert)
       if (error) throw error
@@ -402,7 +406,7 @@ export function WorkspacePage() {
 
       toast.success('Задача создана')
       setTaskDialogOpen(false)
-      setTaskForm({ title: '', description: '', priority: 'medium', deadline: getTodayStr() })
+      setTaskForm({ title: '', description: '', priority: 'medium', deadline: getTodayStr(), deal_id: '', assigned_to: '' })
       refresh()
     } catch (err: any) {
       toast.error('Ошибка создания задачи: ' + (err?.message || ''))
@@ -1015,6 +1019,18 @@ export function WorkspacePage() {
                                           {formatDate(t.deadline)}
                                         </span>
                                       )}
+                                      {t.deal_id && (() => {
+                                        const deal = companyDeals.find((d) => d.id === t.deal_id)
+                                        return deal ? (
+                                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-300 bg-amber-500/10 text-amber-600">{deal.title}</Badge>
+                                        ) : null
+                                      })()}
+                                      {t.assigned_to && taskUsers.length > 0 && (() => {
+                                        const user = taskUsers.find((u) => u.id === t.assigned_to)
+                                        return user ? (
+                                          <span className="text-[10px] text-muted-foreground">→ {user.name}</span>
+                                        ) : null
+                                      })()}
                                     </div>
                                   </div>
                                   <button
@@ -1145,7 +1161,16 @@ export function WorkspacePage() {
       </div>
 
       {/* ── Task Dialog ──────────────────────────────────────────────────── */}
-      <Dialog open={taskDialogOpen} onOpenChange={(open) => { if (!open) setTaskForm({ title: '', description: '', priority: 'medium', deadline: getTodayStr() }) }}>
+      <Dialog open={taskDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setTaskForm({ title: '', description: '', priority: 'medium', deadline: getTodayStr(), deal_id: '', assigned_to: '' })
+          return
+        }
+        // Load users for assignment when opening
+        supabase.from('users').select('id, name').then((res) => {
+          if (!res.error && res.data) setTaskUsers(res.data)
+        }).catch(() => {})
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1188,6 +1213,28 @@ export function WorkspacePage() {
                 <Label>Срок *</Label>
                 <Input type="date" value={taskForm.deadline} onChange={(e) => setTaskForm((f) => ({ ...f, deadline: e.target.value }))} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Сделка</Label>
+              <Select value={taskForm.deal_id} onValueChange={(v) => setTaskForm((f) => ({ ...f, deal_id: v }))}>
+                <SelectTrigger><SelectValue placeholder="Выберите сделку (необязательно)" /></SelectTrigger>
+                <SelectContent>
+                  {companyDeals.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Исполнитель</Label>
+              <Select value={taskForm.assigned_to} onValueChange={(v) => setTaskForm((f) => ({ ...f, assigned_to: v }))}>
+                <SelectTrigger><SelectValue placeholder="Выберите исполнителя (необязательно)" /></SelectTrigger>
+                <SelectContent>
+                  {taskUsers.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setTaskDialogOpen(false)}>Отмена</Button>

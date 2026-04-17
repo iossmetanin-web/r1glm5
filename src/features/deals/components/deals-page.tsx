@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import type { Deal, DealInsert, PipelineStage, Company } from '@/lib/supabase/database.types'
+import type { Deal, DealInsert, PipelineStage, Company, ActivityInsert } from '@/lib/supabase/database.types'
 import { useNavigationStore, useAuthStore } from '@/lib/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -32,7 +32,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
-import { Plus, MoreHorizontal, Trash2, AlertCircle, Package } from 'lucide-react'
+import { Plus, MoreHorizontal, Trash2, AlertCircle, Package, CheckSquare } from 'lucide-react'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -58,6 +58,7 @@ export default function DealsPage() {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterType>('all')
   const [createOpen, setCreateOpen] = useState(false)
+  const [taskCountMap, setTaskCountMap] = useState<Map<string, number>>(new Map())
 
   // Create deal form state
   const [newTitle, setNewTitle] = useState('')
@@ -79,7 +80,7 @@ export default function DealsPage() {
         const [stagesRes, dealsRes, companiesRes] = await Promise.all([
           supabase.from('pipeline_stages').select('*').order('position'),
           supabase.from('deals').select('*').order('created_at', { ascending: false }),
-          supabase.from('companies').select('id, name').order('name'),
+          supabase.from('companies').select('id, name').is('deleted_at', 'is', null).order('name'),
         ])
 
         if (cancelled) return
@@ -91,6 +92,20 @@ export default function DealsPage() {
         setDeals(dealsRes.data ?? [])
         setCompanies(companiesRes.data ?? [])
         setError(null)
+
+        // Load task counts per deal
+        try {
+          const tasksRes = await supabase.from('tasks').select('deal_id').not('deal_id', 'is', null)
+          if (!tasksRes.error && tasksRes.data) {
+            const map = new Map<string, number>()
+            for (const t of tasksRes.data) {
+              if (t.deal_id) {
+                map.set(t.deal_id, (map.get(t.deal_id) ?? 0) + 1)
+              }
+            }
+            setTaskCountMap(map)
+          }
+        } catch { /* task counts optional */ }
       } catch (err: unknown) {
         if (cancelled) return
         setError(err instanceof Error ? err.message : 'Не удалось загрузить данные')
@@ -148,7 +163,7 @@ export default function DealsPage() {
         content: `Перемещена сделка «${deal.title}» в ${newStage.name}`,
         type: 'заметка',
         user_id: currentUser?.id,
-      } as any).catch(() => {})
+      } as ActivityInsert).catch(() => {})
       fetchData()
     } else {
       toast.error('Ошибка: ' + error.message)
@@ -170,7 +185,7 @@ export default function DealsPage() {
         content: `Удалена сделка «${deal.title}»`,
         type: 'заметка',
         user_id: currentUser?.id,
-      } as any).catch(() => {})
+      } as ActivityInsert).catch(() => {})
       fetchData()
     } else {
       toast.error('Ошибка: ' + error.message)
@@ -205,7 +220,7 @@ export default function DealsPage() {
         content: `Создана сделка «${newTitle.trim()}» на ${formatCurrency(newValue || 0)}`,
         type: 'заметка',
         user_id: currentUser?.id,
-      } as any).catch(() => {})
+      } as ActivityInsert).catch(() => {})
       setNewTitle('')
       setNewValue(0)
       setNewCompanyId(null)
@@ -380,6 +395,7 @@ export default function DealsPage() {
                     )}
                     {stageDeals.map((deal) => {
                       const dealCompany = deal.client_id ? companyMap.get(deal.client_id) : null
+                      const taskCount = taskCountMap.get(deal.id) || 0
                       return (
                         <Card
                           key={deal.id}
@@ -401,6 +417,12 @@ export default function DealsPage() {
                             {dealCompany && (
                               <p className="text-xs text-muted-foreground truncate">
                                 {dealCompany.name}
+                              </p>
+                            )}
+                            {taskCount > 0 && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-0.5">
+                                <CheckSquare className="h-3 w-3" />
+                                {taskCount} {taskCount === 1 ? 'задача' : taskCount < 5 ? 'задачи' : 'задач'}
                               </p>
                             )}
                             <div className="flex items-center justify-between mt-2">

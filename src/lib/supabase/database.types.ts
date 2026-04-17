@@ -12,23 +12,23 @@ export interface Database {
           source: string | null; status: string | null; manager_id: string | null
           manager_name: string | null
           next_contact_date: string | null; lost_reason: string | null; notes: string | null
-          created_at: string; updated_at: string
+          created_at: string; updated_at: string; deleted_at: string | null
         }
         Insert: {
           id?: string; name: string; inn?: string | null; city?: string | null
-          website?: string | null; contact_phone?: string | null; contact_email?: string | null
+          website?: string | null; contact_phone: string | null; contact_email: string | null
           source?: string | null; status?: string | null; manager_id?: string | null
           manager_name?: string | null
           next_contact_date?: string | null; lost_reason?: string | null; notes?: string | null
-          created_at?: string; updated_at?: string
+          created_at?: string; updated_at?: string; deleted_at?: string | null
         }
         Update: {
           id?: string; name?: string; inn?: string | null; city?: string | null
-          website?: string | null; contact_phone?: string | null; contact_email?: string | null
+          website?: string | null; contact_phone: string | null; contact_email: string | null
           source?: string | null; status?: string | null; manager_id?: string | null
           manager_name?: string | null
           next_contact_date?: string | null; lost_reason?: string | null; notes?: string | null
-          created_at?: string; updated_at?: string
+          created_at?: string; updated_at?: string; deleted_at?: string | null
         }
       }
 
@@ -111,7 +111,7 @@ export interface Database {
         }
         Update: {
           id?: string; company_id?: string | null; contact_id?: string | null; user_id?: string | null
-          type?: string | null; content?: string; next_contact_date?: string | null; created_at?: string
+          type?: string | null; content?: string | null; next_contact_date?: string | null; created_at?: string
         }
       }
 
@@ -164,6 +164,7 @@ export interface Database {
           client_id: string | null; company_id: string | null; created_by: string | null
           created_at: string; is_recurring: boolean | null; recurrence_days: number | null
           last_recurrence: string | null; is_shared: boolean | null
+          deal_id: string | null; assigned_to: string | null
         }
         Insert: {
           id?: string; title: string; description?: string | null; status?: string
@@ -171,6 +172,7 @@ export interface Database {
           client_id?: string | null; company_id?: string | null; created_by?: string | null
           created_at?: string; is_recurring?: boolean | null; recurrence_days?: number | null
           last_recurrence?: string | null; is_shared?: boolean | null
+          deal_id?: string | null; assigned_to?: string | null
         }
         Update: {
           id?: string; title?: string; description?: string | null; status?: string
@@ -178,6 +180,23 @@ export interface Database {
           client_id?: string | null; company_id?: string | null; created_by?: string | null
           created_at?: string; is_recurring?: boolean | null; recurrence_days?: number | null
           last_recurrence?: string | null; is_shared?: boolean | null
+          deal_id?: string | null; assigned_to?: string | null
+        }
+      }
+
+      // ── Settings (proper config table) ──────────────────────────
+      settings: {
+        Row: {
+          id: string; category: string; key_name: string
+          value: unknown; created_at: string; updated_at: string
+        }
+        Insert: {
+          id?: string; category: string; key_name: string
+          value?: unknown; created_at?: string; updated_at?: string
+        }
+        Update: {
+          id?: string; category?: string; key_name?: string
+          value?: unknown; created_at?: string; updated_at?: string
         }
       }
 
@@ -283,6 +302,8 @@ export type Client = Database['public']['Tables']['clients']['Row']
 export type ClientInsert = Database['public']['Tables']['clients']['Insert']
 export type ClientUpdate = Database['public']['Tables']['clients']['Update']
 export type Reminder = Database['public']['Tables']['reminders']['Row']
+export type Setting = Database['public']['Tables']['settings']['Row']
+export type SettingInsert = Database['public']['Tables']['settings']['Insert']
 
 // ── Extended types with relations ─────────────────────────────────────────────
 
@@ -309,6 +330,8 @@ export type ProposalWithItems = Proposal & {
 
 export type TaskWithRelations = Task & {
   company?: Pick<Company, 'id' | 'name'> | null
+  deal?: Pick<Deal, 'id' | 'title'> | null
+  assigned_user?: Pick<User, 'id' | 'name'> | null
   created_by_user?: Pick<User, 'id' | 'name'> | null
 }
 

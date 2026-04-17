@@ -168,11 +168,12 @@ export function DashboardPage() {
   const [newThisMonth, setNewThisMonth] = useState(0)
   const [overdueCount, setOverdueCount] = useState(0)
   const [funnelAmount, setFunnelAmount] = useState(0)
-  const [activeProposals, setActiveProposals] = useState(0)
+  const [activeDeals, setActiveDeals] = useState(0)
   const [todayTasks, setTodayTasks] = useState<Task[]>([])
   const [todayTasksTotal, setTodayTasksTotal] = useState(0)
   const [todayTasksDone, setTodayTasksDone] = useState(0)
   const [companyMapForTasks, setCompanyMapForTasks] = useState<Map<string, string>>(new Map())
+  const [assignedUserMap, setAssignedUserMap] = useState<Map<string, string>>(new Map())
   const [companiesBySource, setCompaniesBySource] = useState<
     { name: string; value: number; fill: string }[]
   >([])
@@ -193,9 +194,9 @@ export function DashboardPage() {
       // ── Companies (core data — must succeed) ──────────────────────────
       const [companiesCountRes, companiesNewRes, overdueRes, dealsRes, activeDealsRes] =
         await Promise.all([
-          supabase.from('companies').select('*', { count: 'exact', head: true }),
-          supabase.from('companies').select('*', { count: 'exact', head: true }).gte('created_at', monthStart),
-          supabase.from('companies').select('*', { count: 'exact', head: true }).not('next_contact_date', 'is', null).lt('next_contact_date', threeDaysAgo),
+          supabase.from('companies').select('*', { count: 'exact', head: true }).is('deleted_at', 'is', null),
+          supabase.from('companies').select('*', { count: 'exact', head: true }).gte('created_at', monthStart).is('deleted_at', 'is', null),
+          supabase.from('companies').select('*', { count: 'exact', head: true }).not('next_contact_date', 'is', null).lt('next_contact_date', threeDaysAgo).is('deleted_at', 'is', null),
           supabase.from('deals').select('value'),
           supabase.from('deals').select('*', { count: 'exact', head: true }),
         ])
@@ -207,10 +208,10 @@ export function DashboardPage() {
       setOverdueCount(overdueRes.count ?? 0)
       const deals = dealsRes.data ?? []
       setFunnelAmount(deals.reduce((sum, d) => sum + (d.value ?? 0), 0))
-      setActiveProposals(activeDealsRes.count ?? 0)
+      setActiveDeals(activeDealsRes.count ?? 0)
 
       // ── Chart data ─────────────────────────────────────────────────────
-      const companiesBySourceRes = await supabase.from('companies').select('source')
+      const companiesBySourceRes = await supabase.from('companies').select('source').is('deleted_at', 'is', null)
 
       const sourceCounts: Record<string, number> = {}
       for (const s of Object.keys(SOURCE_COLORS)) sourceCounts[s] = 0
@@ -226,8 +227,6 @@ export function DashboardPage() {
           supabase.from('deals').select('stage_id'),
         ])
         if (!stagesRes.error && stagesRes.data) {
-          const stageMap = new Map<string, { name: string; color: string }>()
-          for (const s of stagesRes.data) stageMap.set(s.id, { name: s.name, color: s.color })
           const stageCounts: Record<string, number> = {}
           if (!dealsCountRes.error && dealsCountRes.data) {
             for (const d of dealsCountRes.data) {
@@ -244,10 +243,11 @@ export function DashboardPage() {
 
       // ── Tasks (optional — separate queries, no JOINs) ───────────────
       try {
-        const [tasksRes, tasksAllRes, companiesForTasksRes] = await Promise.all([
+        const [tasksRes, tasksAllRes, companiesForTasksRes, usersForTasksRes] = await Promise.all([
           supabase.from('tasks').select('*').neq('status', 'done').lte('deadline', today).order('priority', { ascending: false }),
           supabase.from('tasks').select('status').lte('deadline', today),
-          supabase.from('companies').select('id, name').order('name'),
+          supabase.from('companies').select('id, name').is('deleted_at', 'is', null).order('name'),
+          supabase.from('users').select('id, name'),
         ])
         if (!tasksRes.error) {
           const taskData = (tasksRes.data as Task[]) ?? []
@@ -264,6 +264,14 @@ export function DashboardPage() {
               map.set(c.id, c.name)
             }
             setCompanyMapForTasks(map)
+          }
+          // Build assigned user map for tasks
+          if (!usersForTasksRes.error && usersForTasksRes.data) {
+            const map = new Map<string, string>()
+            for (const u of usersForTasksRes.data) {
+              map.set(u.id, u.name)
+            }
+            setAssignedUserMap(map)
           }
         }
       } catch { /* tasks table may not exist */ }
@@ -376,7 +384,7 @@ export function DashboardPage() {
     {
       title: 'Воронка',
       value: formatCurrency(funnelAmount),
-      subtitle: `${activeProposals} активных сделок`,
+      subtitle: `${activeDeals} активных сделок`,
       icon: TrendingUp,
       iconBg: 'bg-emerald-500/10',
       iconColor: 'text-emerald-600 dark:text-emerald-400',
@@ -737,6 +745,11 @@ export function DashboardPage() {
                             {task.company_id && companyMapForTasks.get(task.company_id) && (
                               <span className="text-xs text-muted-foreground">
                                 {companyMapForTasks.get(task.company_id)!}
+                              </span>
+                            )}
+                            {task.assigned_to && assignedUserMap.get(task.assigned_to) && (
+                              <span className="text-xs text-muted-foreground">
+                                → {assignedUserMap.get(task.assigned_to)!}
                               </span>
                             )}
                             {isOverdue && (

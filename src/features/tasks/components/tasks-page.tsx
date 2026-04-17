@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import type { TaskWithRelations, Company } from '@/lib/supabase/database.types'
+import type { TaskWithRelations, Company, Deal, User } from '@/lib/supabase/database.types'
 import { useAuthStore, useNavigationStore } from '@/lib/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -48,6 +48,8 @@ import {
   Building2,
   ArrowRight,
   Clock,
+  Briefcase,
+  UserCircle,
 } from 'lucide-react'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -62,6 +64,8 @@ interface TaskFormData {
   priority: TaskPriority
   deadline: string
   company_id: string
+  deal_id: string
+  assigned_to: string
   status: TaskStatus
   is_recurring: boolean
   recurrence_days: number
@@ -101,6 +105,8 @@ const EMPTY_FORM: TaskFormData = {
   priority: 'medium',
   deadline: '',
   company_id: '',
+  deal_id: '',
+  assigned_to: '',
   status: 'todo',
   is_recurring: false,
   recurrence_days: 1,
@@ -178,6 +184,8 @@ export default function TasksPage() {
 
   const [tasks, setTasks] = useState<TaskWithRelations[]>([])
   const [companies, setCompanies] = useState<Company[]>([])
+  const [deals, setDeals] = useState<Deal[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<FilterTab>('all')
@@ -219,8 +227,22 @@ export default function TasksPage() {
       const { data } = await supabase
         .from('companies')
         .select('id, name')
+        .is('deleted_at', 'is', null)
         .order('name')
       if (data) setCompanies(data)
+    } catch {
+      // non-critical
+    }
+  }, [])
+
+  const fetchDealsAndUsers = useCallback(async () => {
+    try {
+      const [dealsRes, usersRes] = await Promise.all([
+        supabase.from('deals').select('id, title'),
+        supabase.from('users').select('id, name'),
+      ])
+      if (dealsRes.data) setDeals(dealsRes.data)
+      if (usersRes.data) setUsers(usersRes.data)
     } catch {
       // non-critical
     }
@@ -230,16 +252,17 @@ export default function TasksPage() {
     let cancelled = false
 
     async function load() {
-      // Companies fetch is non-critical — run independently
+      // Companies, deals, users fetch is non-critical — run independently
       fetchCompanies().catch(() => {})
+      fetchDealsAndUsers().catch(() => {})
       await fetchTasks()
       if (!cancelled) setLoading(false)
     }
     load()
     return () => { cancelled = true }
-  }, [fetchTrigger, fetchTasks, fetchCompanies])
+  }, [fetchTrigger, fetchTasks, fetchCompanies, fetchDealsAndUsers])
 
-  // ─── Company Lookup Map ────────────────────────────────────────────────
+  // ─── Lookup Maps ────────────────────────────────────────────────────
 
   const companyMap = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>()
@@ -248,6 +271,22 @@ export default function TasksPage() {
     }
     return map
   }, [companies])
+
+  const dealMap = useMemo(() => {
+    const map = new Map<string, { id: string; title: string }>()
+    for (const d of deals) {
+      map.set(d.id, { id: d.id, title: d.title ?? '' })
+    }
+    return map
+  }, [deals])
+
+  const userMap = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>()
+    for (const u of users) {
+      map.set(u.id, { id: u.id, name: u.name ?? '' })
+    }
+    return map
+  }, [users])
 
   const refresh = () => {
     setLoading(true)
@@ -397,6 +436,8 @@ export default function TasksPage() {
       priority: (task.priority as TaskPriority) || 'medium',
       deadline: task.deadline ?? '',
       company_id: task.company_id ?? '',
+      deal_id: task.deal_id ?? '',
+      assigned_to: task.assigned_to ?? '',
       status: (task.status as TaskStatus) || 'todo',
       is_recurring: task.is_recurring ?? false,
       recurrence_days: task.recurrence_days ?? 1,
@@ -419,6 +460,8 @@ export default function TasksPage() {
             priority: form.priority,
             deadline: form.deadline || null,
             company_id: form.company_id || null,
+            deal_id: form.deal_id || null,
+            assigned_to: form.assigned_to || null,
             status: form.status,
             is_recurring: form.is_recurring || null,
             recurrence_days: form.is_recurring ? form.recurrence_days : null,
@@ -446,6 +489,8 @@ export default function TasksPage() {
             priority: form.priority,
             deadline: form.deadline || null,
             company_id: form.company_id || null,
+            deal_id: form.deal_id || null,
+            assigned_to: form.assigned_to || null,
             created_by: currentUser?.id,
             is_recurring: form.is_recurring || null,
             recurrence_days: form.is_recurring ? form.recurrence_days : null,
@@ -785,6 +830,25 @@ export default function TasksPage() {
                             </Badge>
                           )}
 
+                          {/* Deal Badge */}
+                          {task.deal_id && dealMap.get(task.deal_id) && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] font-medium gap-1 border-amber-300 bg-amber-500/10 text-amber-600 dark:text-amber-400 dark:border-amber-800"
+                            >
+                              <Briefcase className="h-3 w-3" />
+                              {dealMap.get(task.deal_id!)!.title}
+                            </Badge>
+                          )}
+
+                          {/* Assigned User */}
+                          {task.assigned_to && userMap.get(task.assigned_to) && (
+                            <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
+                              <UserCircle className="h-3 w-3" />
+                              → {userMap.get(task.assigned_to!)!.name}
+                            </span>
+                          )}
+
                           {/* Recurring Badge */}
                           {task.is_recurring && task.recurrence_days && (
                             <Badge
@@ -937,6 +1001,46 @@ export default function TasksPage() {
                   {companies.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Deal */}
+            <div className="space-y-2">
+              <Label>Сделка</Label>
+              <Select
+                value={form.deal_id}
+                onValueChange={(v) => updateForm({ deal_id: v })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Выберите сделку (необязательно)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {deals.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Assigned To */}
+            <div className="space-y-2">
+              <Label>Исполнитель</Label>
+              <Select
+                value={form.assigned_to}
+                onValueChange={(v) => updateForm({ assigned_to: v })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Выберите исполнителя (необязательно)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

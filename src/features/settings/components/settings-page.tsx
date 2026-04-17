@@ -93,36 +93,39 @@ interface TaskPriority { id: string; name: string }
 
 // ─── Settings Storage Helpers ────────────────────────────────────────────────
 
-const SETTINGS_IDS: Record<string, string> = {
-  tags: '00000001-0000-0000-0000-000000000001',
-  segments: '00000001-0000-0000-0000-000000000002',
-  custom_fields: '00000001-0000-0000-0000-000000000003',
-  task_statuses: '00000001-0000-0000-0000-000000000004',
-  task_priorities: '00000001-0000-0000-0000-000000000005',
-  reminder: '00000001-0000-0000-0000-000000000006',
+const SETTINGS_MAP: Record<string, { category: string; key_name: string }> = {
+  tags: { category: 'tags', key_name: 'tags_list' },
+  segments: { category: 'segments', key_name: 'segments_list' },
+  custom_fields: { category: 'custom_fields', key_name: 'custom_fields_list' },
+  task_statuses: { category: 'task_statuses', key_name: 'task_statuses_list' },
+  task_priorities: { category: 'task_priorities', key_name: 'task_priorities_list' },
+  reminder: { category: 'reminder', key_name: 'reminder_on' },
 }
 
-async function loadSettings<T>(category: string, fallback: T): Promise<T> {
+async function loadSettings<T>(settingsKey: string, fallback: T): Promise<T> {
   try {
+    const map = SETTINGS_MAP[settingsKey]
+    if (!map) return fallback
     const { data } = await supabase
-      .from('activities')
-      .select('content, type')
-      .eq('id', SETTINGS_IDS[category])
-      .eq('type', 'settings')
+      .from('settings')
+      .select('value')
+      .eq('category', map.category)
+      .eq('key_name', map.key_name)
       .single()
-    if (!data?.content) return fallback
-    try { return JSON.parse(data.content) as T }
-    catch { return fallback }
+    if (!data?.value) return fallback
+    return data.value as T
   } catch { return fallback }
 }
 
-async function saveSettings(category: string, data: unknown): Promise<boolean> {
+async function saveSettings(settingsKey: string, data: unknown): Promise<boolean> {
   try {
+    const map = SETTINGS_MAP[settingsKey]
+    if (!map) return false
     const { error } = await supabase
-      .from('activities')
+      .from('settings')
       .upsert(
-        { id: SETTINGS_IDS[category], content: JSON.stringify(data), type: 'settings', user_id: null, company_id: null },
-        { onConflict: 'id' }
+        { category: map.category, key_name: map.key_name, value: data },
+        { onConflict: 'category,key_name' }
       )
     return !error
   } catch { return false }
