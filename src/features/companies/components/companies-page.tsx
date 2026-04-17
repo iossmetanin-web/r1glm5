@@ -47,6 +47,8 @@ import {
   AlertCircle,
   AlertTriangle,
   Building2,
+  Tag,
+  X,
 } from 'lucide-react'
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -147,6 +149,56 @@ function pluralizeCompanies(n: number): string {
   return 'компаний'
 }
 
+// ─── Tag helpers ─────────────────────────────────────────────────────────────
+
+interface TagItem { id: string; name: string; color: string }
+
+const SETTINGS_TAGS_ID = '00000001-0000-0000-0000-000000000001'
+
+async function loadTags(): Promise<TagItem[]> {
+  try {
+    const { data } = await supabase
+      .from('activities')
+      .select('content')
+      .eq('id', SETTINGS_TAGS_ID)
+      .eq('type', 'settings')
+      .single()
+    if (!data?.content) return []
+    try { return JSON.parse(data.content) as TagItem[] }
+    catch { return [] }
+  } catch { return [] }
+}
+
+async function getCompanyTags(companyId: string): Promise<string[]> {
+  try {
+    const { data } = await supabase
+      .from('activities')
+      .select('content')
+      .eq('company_id', companyId)
+      .eq('type', 'company_tag')
+    if (!data) return []
+    return data.map((a) => a.content)
+  } catch { return [] }
+}
+
+async function addCompanyTag(companyId: string, tagName: string) {
+  await supabase.from('activities').insert({
+    company_id: companyId,
+    type: 'company_tag',
+    content: tagName,
+    user_id: null,
+  })
+}
+
+async function removeCompanyTag(companyId: string, tagName: string) {
+  await supabase
+      .from('activities')
+      .delete()
+      .eq('company_id', companyId)
+      .eq('type', 'company_tag')
+      .eq('content', tagName)
+}
+
 // ─── Form types ───────────────────────────────────────────────────────────────
 
 interface CompanyFormData {
@@ -193,6 +245,11 @@ export function CompaniesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('Все')
   const [managerFilter, setManagerFilter] = useState<ManagerFilter>('Все')
   const [sourceFilter, setSourceFilter] = useState('')
+  const [tagFilter, setTagFilter] = useState('')
+
+  // Tags state
+  const [allTags, setAllTags] = useState<TagItem[]>([])
+  const [companyTags, setCompanyTags] = useState<Record<string, string[]>>({})
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -200,6 +257,10 @@ export function CompaniesPage() {
   const [form, setForm] = useState<CompanyFormData>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [innWarning, setInnWarning] = useState<string | null>(null)
+
+  // Edit dialog tags
+  const [dialogTags, setDialogTags] = useState<string[]>([])
+  const [addingTag, setAddingTag] = useState(false)
 
   // Overdue highlight
   const [showOverdue, setShowOverdue] = useState(false)
@@ -240,11 +301,39 @@ export function CompaniesPage() {
         if (!res.error) managersData = res.data ?? []
       } catch { /* managers optional */ }
 
+      // Load tags and company tags
+      try {
+        const tags = await loadTags()
+        if (!cancelled) setAllTags(tags)
+      } catch { /* tags optional */ }
+
       if (cancelled) return
       setCompanies(companiesData)
       setManagers(managersData)
       setError(loadError)
       setLoading(false)
+
+      // Load company tags for all companies
+      if (!cancelled && companiesData.length > 0) {
+        try {
+          const { data: tagData } = await supabase
+            .from('activities')
+            .select('company_id, content')
+            .eq('type', 'company_tag')
+          if (tagData && !cancelled) {
+            const tagMap: Record<string, string[]> = {}
+            for (const c of companiesData) {
+              tagMap[c.id] = []
+            }
+            for (const t of tagData) {
+              if (t.company_id && tagMap[t.company_id]) {
+                tagMap[t.company_id].push(t.content)
+              }
+            }
+            setCompanyTags(tagMap)
+          }
+        } catch { /* company tags optional */ }
+      }
     }
     load()
     return () => {
@@ -272,6 +361,14 @@ export function CompaniesPage() {
 
   const filteredCompanies = useMemo(() => {
     let result = [...companies]
+
+    // Tag filter
+    if (tagFilter) {
+      result = result.filter((c) => {
+        const tags = companyTags[c.id] || []
+        return tags.includes(tagFilter)
+      })
+    }
 
     // Search
     if (searchQuery.trim()) {
@@ -308,7 +405,7 @@ export function CompaniesPage() {
     })
 
     return result
-  }, [companies, searchQuery, statusFilter, managerFilter, sourceFilter, currentUser])
+  }, [companies, searchQuery, statusFilter, managerFilter, sourceFilter, tagFilter, companyTags, currentUser])
 
   // ─── INN Duplicate Check ─────────────────────────────────────────────────
 
@@ -351,7 +448,7 @@ export function CompaniesPage() {
     setDialogOpen(true)
   }
 
-  const openEditDialog = (company: CompanyWithManager) => {
+  const openEditDialog = async (company: CompanyWithManager) => {
     setEditingCompany(company)
     setForm({
       name: company.name ?? '',
@@ -369,6 +466,9 @@ export function CompaniesPage() {
       notes: company.notes ?? '',
     })
     setInnWarning(null)
+    // Load company tags for editing
+    const tags = await getCompanyTags(company.id)
+    setDialogTags(tags)
     setDialogOpen(true)
   }
 
@@ -538,7 +638,8 @@ export function CompaniesPage() {
             {searchQuery.trim() ||
             statusFilter !== 'Все' ||
             sourceFilter ||
-            managerFilter !== 'Все'
+            managerFilter !== 'Все' ||
+            tagFilter
               ? ` · ${filteredCompanies.length} найдено`
               : ''}
           </p>
@@ -628,6 +729,27 @@ export function CompaniesPage() {
             ))}
           </SelectContent>
         </Select>
+
+        {/* Tag filter */}
+        {allTags.length > 0 && (
+          <Select value={tagFilter} onValueChange={(v) => setTagFilter(v === '__none__' ? '' : v)}>
+            <SelectTrigger className="w-auto h-8 rounded-xl text-xs min-w-[130px]">
+              <Tag className="h-3 w-3 mr-1.5 shrink-0" />
+              <SelectValue placeholder="Все теги" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Все теги</SelectItem>
+              {allTags.map((t) => (
+                <SelectItem key={t.id} value={t.name}>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                    {t.name}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* ── Overdue Banner ─────────────────────────────────────────────────── */}
@@ -686,6 +808,7 @@ export function CompaniesPage() {
               setStatusFilter('Все')
               setSourceFilter('')
               setManagerFilter('Все')
+              setTagFilter('')
             }}
           >
             Сбросить фильтры
@@ -715,6 +838,7 @@ export function CompaniesPage() {
                     const overdue = isOverdue(company.next_contact_date)
                     const contactLabel = getNextContactLabel(company.next_contact_date)
                     const statusBadge = getStatusBadge(company.status)
+                    const tags = companyTags[company.id] || []
 
                     return (
                       <TableRow
@@ -727,9 +851,28 @@ export function CompaniesPage() {
                       >
                         <TableCell className="pl-4">
                           <div className="flex flex-col">
-                            <span className="font-medium text-foreground truncate max-w-[260px]">
-                              {company.name}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium text-foreground truncate max-w-[260px]">
+                                {company.name}
+                              </span>
+                              {tags.map((tag) => {
+                                const tagInfo = allTags.find((t) => t.name === tag)
+                                return (
+                                  <Badge
+                                    key={tag}
+                                    variant="outline"
+                                    className="text-[10px] px-1.5 py-0 border-transparent shrink-0"
+                                    style={{
+                                      backgroundColor: (tagInfo?.color || '#94a3b8') + '18',
+                                      color: tagInfo?.color || '#94a3b8',
+                                      borderColor: (tagInfo?.color || '#94a3b8') + '30',
+                                    }}
+                                  >
+                                    {tag}
+                                  </Badge>
+                                )
+                              })}
+                            </div>
                             <span className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
                               {company.inn && (
                                 <>
@@ -806,6 +949,7 @@ export function CompaniesPage() {
               const overdue = isOverdue(company.next_contact_date)
               const contactLabel = getNextContactLabel(company.next_contact_date)
               const statusBadge = getStatusBadge(company.status)
+              const tags = companyTags[company.id] || []
 
               return (
                 <div
@@ -869,6 +1013,23 @@ export function CompaniesPage() {
                         {company.source}
                       </Badge>
                     )}
+                    {tags.map((tag) => {
+                      const tagInfo = allTags.find((t) => t.name === tag)
+                      return (
+                        <Badge
+                          key={tag}
+                          variant="outline"
+                          className="text-[10px] px-1.5 py-0 border-transparent"
+                          style={{
+                            backgroundColor: (tagInfo?.color || '#94a3b8') + '18',
+                            color: tagInfo?.color || '#94a3b8',
+                            borderColor: (tagInfo?.color || '#94a3b8') + '30',
+                          }}
+                        >
+                          {tag}
+                        </Badge>
+                      )
+                    })}
                   </div>
 
                   {/* Footer: manager + next contact */}
@@ -1098,6 +1259,103 @@ export function CompaniesPage() {
                 }
               />
             </div>
+
+            {/* Теги */}
+            {editingCompany && allTags.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5">
+                  <Tag className="h-3.5 w-3.5" />
+                  Теги
+                </Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {dialogTags.map((tag) => {
+                    const tagInfo = allTags.find((t) => t.name === tag)
+                    return (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        className="text-xs gap-1 pl-2 pr-1 py-0.5 cursor-pointer hover:opacity-80 transition-opacity"
+                        style={{
+                          backgroundColor: (tagInfo?.color || '#94a3b8') + '18',
+                          color: tagInfo?.color || '#94a3b8',
+                          borderColor: (tagInfo?.color || '#94a3b8') + '30',
+                        }}
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDialogTags((prev) => prev.filter((t) => t !== tag))
+                            if (editingCompany) {
+                              removeCompanyTag(editingCompany.id, tag).then(() => {
+                                // Update local company tags cache
+                                setCompanyTags((prev) => ({
+                                  ...prev,
+                                  [editingCompany.id]: (prev[editingCompany.id] || []).filter((t) => t !== tag),
+                                }))
+                              })
+                            }
+                          }}
+                          className="ml-0.5 h-3.5 w-3.5 inline-flex items-center justify-center rounded-full hover:bg-black/10"
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </Badge>
+                    )
+                  })}
+                  {allTags
+                    .filter((t) => !dialogTags.includes(t.name))
+                    .length > 0 && !addingTag && (
+                    <button
+                      type="button"
+                      onClick={() => setAddingTag(true)}
+                      className="h-6 px-2 rounded-lg border border-dashed border-muted-foreground/40 text-xs text-muted-foreground hover:border-foreground/40 hover:text-foreground transition-colors"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Добавить
+                    </button>
+                  )}
+                  {addingTag && (
+                    <div className="flex gap-1">
+                      {allTags
+                        .filter((t) => !dialogTags.includes(t.name))
+                        .map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => {
+                              setDialogTags((prev) => [...prev, t.name])
+                              setAddingTag(false)
+                              if (editingCompany) {
+                                addCompanyTag(editingCompany.id, t.name).then(() => {
+                                  setCompanyTags((prev) => ({
+                                    ...prev,
+                                    [editingCompany.id]: [...(prev[editingCompany.id] || []), t.name],
+                                  }))
+                                })
+                              }
+                            }}
+                            className="h-6 px-2 rounded-lg border border-dashed text-xs hover:bg-muted/50 transition-colors"
+                            style={{
+                              color: t.color,
+                              borderColor: t.color + '40',
+                            }}
+                          >
+                            {t.name}
+                          </button>
+                        ))}
+                      <button
+                        type="button"
+                        onClick={() => setAddingTag(false)}
+                        className="h-6 px-2 rounded-lg text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Заметки */}
             <div className="space-y-2">

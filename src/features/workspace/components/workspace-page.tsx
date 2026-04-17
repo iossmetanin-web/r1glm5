@@ -13,6 +13,8 @@ import type {
   ActivityInsert,
   Comment,
   CommentInsert,
+  Deal,
+  PipelineStage,
 } from '@/lib/supabase/database.types'
 import { useAuthStore, useNavigationStore } from '@/lib/store'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -59,8 +61,10 @@ import {
   Clock,
   ArrowLeft,
   Briefcase,
+  ChevronLeft,
   ChevronRight,
   StickyNote,
+  Tag,
   X,
   Loader2,
   Upload,
@@ -170,7 +174,14 @@ export function WorkspacePage() {
   const [proposalItems, setProposalItems] = useState<Record<string, ProposalItem[]>>({})
   const [activities, setActivities] = useState<Activity[]>([])
   const [comments, setComments] = useState<Comment[]>([])
+  const [companyDeals, setCompanyDeals] = useState<Deal[]>([])
+  const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>([])
   const [activeTab, setActiveTab] = useState('info')
+
+  // Tags state
+  const [allTags, setAllTags] = useState<{ id: string; name: string; color: string }[]>([])
+  const [companyTags, setCompanyTags] = useState<string[]>([])
+  const [addingTag, setAddingTag] = useState(false)
 
   // Task dialog
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
@@ -228,7 +239,11 @@ export function WorkspacePage() {
       setProposals([])
       setActivities([])
       setComments([])
+      setCompanyDeals([])
+      setPipelineStages([])
       setFiles([])
+      setCompanyTags([])
+      setAddingTag(false)
       return
     }
 
@@ -241,6 +256,8 @@ export function WorkspacePage() {
         supabase.from('proposals').select('*').eq('company_id', selectedId).order('created_at', { ascending: false }),
         supabase.from('activities').select('*').eq('company_id', selectedId).order('created_at', { ascending: false }).limit(50),
         supabase.from('comments').select('*').eq('entity_id', selectedId).order('created_at', { ascending: false }).limit(100),
+        supabase.from('pipeline_stages').select('*').order('position'),
+        supabase.from('deals').select('*').eq('client_id', selectedId).order('created_at', { ascending: false }),
       ])
 
       if (cancelled) return
@@ -268,14 +285,67 @@ export function WorkspacePage() {
 
       setActivities(results[4].status === 'fulfilled' ? (results[4].value?.data ?? []) : [])
       setComments(results[5].status === 'fulfilled' ? (results[5].value?.data ?? []) : [])
+      setPipelineStages(results[6].status === 'fulfilled' ? (results[6].value?.data ?? []) : [])
+      setCompanyDeals(results[7].status === 'fulfilled' ? (results[7].value?.data ?? []) : [])
 
       // Load files
       const filesResult = await supabase.storage.from('crm-files').list(selectedId, { sortBy: { column: 'created_at', order: 'desc' } })
       if (!cancelled) setFiles(filesResult.data ?? [])
+
+      // Load company tags
+      try {
+        const SETTINGS_TAGS_ID = '00000001-0000-0000-0000-000000000001'
+        const { data: settingsData } = await supabase
+          .from('activities')
+          .select('content')
+          .eq('id', SETTINGS_TAGS_ID)
+          .eq('type', 'settings')
+          .single()
+        if (settingsData?.content && !cancelled) {
+          try { setAllTags(JSON.parse(settingsData.content)) } catch { /* ignore */ }
+        }
+      } catch { /* ignore */ }
+
+      // Load company tags
+      try {
+        const { data: tagRows } = await supabase
+          .from('activities')
+          .select('content')
+          .eq('company_id', selectedId)
+          .eq('type', 'company_tag')
+        if (tagRows && !cancelled) {
+          setCompanyTags(tagRows.map((r) => r.content))
+        }
+      } catch { /* ignore */ }
     }
     loadDetails()
     return () => { cancelled = true }
   }, [selectedId])
+
+  // ─── Tag helpers ──────────────────────────────────────────────────────────
+
+  async function addTagToCompany(tagName: string) {
+    if (!selectedId) return
+    await supabase.from('activities').insert({
+      company_id: selectedId,
+      type: 'company_tag',
+      content: tagName,
+      user_id: null,
+    })
+    setCompanyTags((prev) => [...prev, tagName])
+    setAddingTag(false)
+  }
+
+  async function removeTagFromCompany(tagName: string) {
+    if (!selectedId) return
+    await supabase
+      .from('activities')
+      .delete()
+      .eq('company_id', selectedId)
+      .eq('type', 'company_tag')
+      .eq('content', tagName)
+    setCompanyTags((prev) => prev.filter((t) => t !== tagName))
+  }
 
   // ─── Computed ───────────────────────────────────────────────────────────────
 
@@ -386,6 +456,49 @@ export function WorkspacePage() {
     if (!error) {
       toast.success(`Статус КП изменён на «${newStatus}»`)
       refresh()
+    }
+  }
+
+  // ─── Deal Actions ─────────────────────────────────────────────────────
+
+  const moveDeal = async (deal: Deal, newIndex: number) => {
+    if (newIndex < 0 || newIndex >= pipelineStages.length) return
+    const newStage = pipelineStages[newIndex]
+    const { error } = await supabase
+      .from('deals')
+      .update({ stage_id: newStage.id })
+      .eq('id', deal.id)
+    if (!error) {
+      toast.success(`Сделка «${deal.title}» перемещена в «${newStage.name}»`)
+      await supabase.from('activities').insert({
+        company_id: selectedId,
+        content: `Перемещена сделка «${deal.title}» в ${newStage.name}`,
+        type: 'заметка',
+        user_id: currentUser?.id,
+      } as ActivityInsert).catch(() => {})
+      refresh()
+    } else {
+      toast.error('Ошибка: ' + error.message)
+    }
+  }
+
+  const deleteDeal = async (deal: Deal) => {
+    if (!window.confirm(`Удалить сделку «${deal.title}»?`)) return
+    const { error } = await supabase
+      .from('deals')
+      .delete()
+      .eq('id', deal.id)
+    if (!error) {
+      toast.success(`Сделка «${deal.title}» удалена`)
+      await supabase.from('activities').insert({
+        company_id: selectedId,
+        content: `Удалена сделка «${deal.title}»`,
+        type: 'заметка',
+        user_id: currentUser?.id,
+      } as ActivityInsert).catch(() => {})
+      refresh()
+    } else {
+      toast.error('Ошибка: ' + error.message)
     }
   }
 
@@ -564,8 +677,11 @@ export function WorkspacePage() {
                   <TabsTrigger value="info" className="rounded-lg text-xs gap-1.5">
                     Информация
                   </TabsTrigger>
-                  <TabsTrigger value="deals" className="rounded-lg text-xs gap-1.5">
+                  <TabsTrigger value="proposals" className="rounded-lg text-xs gap-1.5">
                     КП ({proposals.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="deals" className="rounded-lg text-xs gap-1.5">
+                    Сделки ({companyDeals.length})
                   </TabsTrigger>
                   <TabsTrigger value="tasks" className="rounded-lg text-xs gap-1.5">
                     Задачи ({taskStats.total})
@@ -628,6 +744,82 @@ export function WorkspacePage() {
                         </Card>
                       )}
 
+                      {/* Tags */}
+                      <Card className="rounded-xl border border-border/60 shadow-sm">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-1.5">
+                            <Tag className="h-3.5 w-3.5" />
+                            Теги
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-1.5">
+                            {companyTags.map((tag) => {
+                              const tagInfo = allTags.find((t) => t.name === tag)
+                              return (
+                                <Badge
+                                  key={tag}
+                                  variant="outline"
+                                  className="text-xs gap-1 pl-2 pr-1 py-0.5 cursor-pointer hover:opacity-80 transition-opacity"
+                                  style={{
+                                    backgroundColor: (tagInfo?.color || '#94a3b8') + '18',
+                                    color: tagInfo?.color || '#94a3b8',
+                                    borderColor: (tagInfo?.color || '#94a3b8') + '30',
+                                  }}
+                                >
+                                  {tag}
+                                  <button
+                                    onClick={() => removeTagFromCompany(tag)}
+                                    className="ml-0.5 h-3.5 w-3.5 inline-flex items-center justify-center rounded-full hover:bg-black/10"
+                                  >
+                                    <X className="h-2.5 w-2.5" />
+                                  </button>
+                                </Badge>
+                              )
+                            })}
+                            {allTags
+                              .filter((t) => !companyTags.includes(t.name))
+                              .length > 0 && !addingTag && (
+                              <button
+                                onClick={() => setAddingTag(true)}
+                                className="h-6 px-2 rounded-lg border border-dashed border-muted-foreground/40 text-xs text-muted-foreground hover:border-foreground/40 hover:text-foreground transition-colors"
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Добавить
+                              </button>
+                            )}
+                            {addingTag && (
+                              <div className="flex flex-wrap gap-1">
+                                {allTags
+                                  .filter((t) => !companyTags.includes(t.name))
+                                  .map((t) => (
+                                    <button
+                                      key={t.id}
+                                      onClick={() => addTagToCompany(t.name)}
+                                      className="h-6 px-2 rounded-lg border border-dashed text-xs hover:bg-muted/50 transition-colors"
+                                      style={{
+                                        color: t.color,
+                                        borderColor: t.color + '40',
+                                      }}
+                                    >
+                                      {t.name}
+                                    </button>
+                                  ))}
+                                <button
+                                  onClick={() => setAddingTag(false)}
+                                  className="h-6 px-2 rounded-lg text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  Отмена
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {companyTags.length === 0 && !addingTag && allTags.length === 0 && (
+                            <p className="text-sm text-muted-foreground py-1">Нет тегов. Добавьте теги в настройках.</p>
+                          )}
+                        </CardContent>
+                      </Card>
+
                       {/* Next Contact */}
                       {company.next_contact_date && (
                         <Card className="rounded-xl border border-border/60 shadow-sm">
@@ -644,8 +836,8 @@ export function WorkspacePage() {
                     </div>
                   </TabsContent>
 
-                  {/* TAB: Deals (КП) */}
-                  <TabsContent value="deals" className="mt-0">
+                  {/* TAB: Proposals (КП) */}
+                  <TabsContent value="proposals" className="mt-0">
                     <div className="space-y-3">
                       {proposals.length === 0 ? (
                         <Card className="rounded-xl border border-border/60 shadow-sm p-6">
@@ -692,6 +884,94 @@ export function WorkspacePage() {
                             </CardContent>
                           </Card>
                         ))
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  {/* TAB: Deals (Сделки) */}
+                  <TabsContent value="deals" className="mt-0">
+                    <div className="space-y-3">
+                      {companyDeals.length === 0 ? (
+                        <Card className="rounded-xl border border-border/60 shadow-sm p-6">
+                          <div className="flex flex-col items-center gap-2">
+                            <Briefcase className="h-8 w-8 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Нет сделок</p>
+                          </div>
+                        </Card>
+                      ) : (
+                        companyDeals.map((deal) => {
+                          const stage = pipelineStages.find((s) => s.id === deal.stage_id)
+                          const stageIndex = pipelineStages.findIndex((s) => s.id === deal.stage_id)
+                          const stageColor = stage?.color || '#94a3b8'
+                          return (
+                            <Card key={deal.id} className="rounded-xl border border-border/60 shadow-sm">
+                              <CardContent className="p-4">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium">{deal.title}</p>
+                                    <p className="text-base font-semibold text-foreground mt-1">{formatCurrency(deal.value)}</p>
+                                  </div>
+                                  <button
+                                    onClick={() => deleteDeal(deal)}
+                                    className="h-7 w-7 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                                <div className="flex items-center gap-2 mt-2">
+                                  {stage && (
+                                    <Badge
+                                      className="text-[10px] px-1.5 py-0 border-transparent"
+                                      style={{ backgroundColor: stageColor + '18', color: stageColor }}
+                                    >
+                                      {stage.name}
+                                    </Badge>
+                                  )}
+                                  {deal.priority && (
+                                    <Badge className={`text-[10px] px-1.5 py-0 ${PRIORITY_BADGE[deal.priority] || 'bg-muted text-muted-foreground'}`}>
+                                      {PRIORITY_LABELS[deal.priority] || deal.priority}
+                                    </Badge>
+                                  )}
+                                </div>
+                                {/* Stage navigation */}
+                                {pipelineStages.length > 1 && (
+                                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/40">
+                                    <button
+                                      onClick={() => moveDeal(deal, stageIndex - 1)}
+                                      disabled={stageIndex <= 0}
+                                      className="h-7 w-7 shrink-0 rounded-lg flex items-center justify-center border border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/60 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                                    >
+                                      <ChevronLeft className="h-3.5 w-3.5" />
+                                    </button>
+                                    <div className="flex-1 flex items-center gap-1 overflow-x-auto">
+                                      {pipelineStages.map((s, i) => (
+                                        <button
+                                          key={s.id}
+                                          onClick={() => moveDeal(deal, i)}
+                                          className={`h-1.5 rounded-full transition-all ${
+                                            i === stageIndex
+                                              ? 'w-4'
+                                              : 'w-1.5 bg-border'
+                                          }`}
+                                          style={i === stageIndex ? { backgroundColor: s.color || '#94a3b8' } : undefined}
+                                          title={s.name}
+                                        />
+                                      ))}
+                                    </div>
+                                    <button
+                                      onClick={() => moveDeal(deal, stageIndex + 1)}
+                                      disabled={stageIndex >= pipelineStages.length - 1}
+                                      className="h-7 w-7 shrink-0 rounded-lg flex items-center justify-center border border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/60 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                                    >
+                                      <ChevronRight className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                                <p className="text-[10px] text-muted-foreground/60 mt-2">{formatDate(deal.created_at)}</p>
+                              </CardContent>
+                            </Card>
+                          )
+                        })
                       )}
                     </div>
                   </TabsContent>

@@ -39,3 +39,36 @@ Stage Summary:
 - Dashboard tasks show company names instead of raw IDs
 - Settings page stores config via activities table (type: 'settings') — confirmed working
 - Workspace page has full client work: info, КП, tasks, history, comments tabs
+
+---
+Task ID: 2-b
+Agent: Main
+Task: Add "Сделки" (Deals) tab to workspace page
+
+Work Log:
+- Read worklog.md and workspace-page.tsx to understand existing code and patterns
+- Read database.types.ts to confirm Deal and PipelineStage type definitions
+- Studied deals-page.tsx for moveDeal and deleteDeal patterns
+- Added `Deal` and `PipelineStage` type imports
+- Added `ChevronLeft` icon import for stage navigation arrows
+- Added state variables: `companyDeals` (Deal[]) and `pipelineStages` (PipelineStage[])
+- Added clear calls for new state in the selectedId reset block
+- Added 2 new queries to loadDetails effect: `pipeline_stages` (ordered by position) and `deals` (filtered by client_id = selectedId)
+- Added `moveDeal` function: updates stage_id, logs activity, shows toast, calls refresh()
+- Added `deleteDeal` function: confirms deletion, removes deal, logs activity, shows toast, calls refresh()
+- Renamed existing КП tab value from "deals" to "proposals" (both trigger and content) to avoid conflict
+- Added new "Сделки" tab trigger between КП and Задачи showing companyDeals.length count
+- Added new "Сделки" tab content with:
+  - Empty state with Briefcase icon when no deals
+  - Deal cards showing: title, value (RUB formatted), stage badge (colored), priority badge
+  - Stage navigation bar with left/right arrows and clickable stage dots
+  - Delete button on each card
+  - Created date display
+- Verified lint passes clean (no errors)
+- Verified dev server compiling successfully
+
+Stage Summary:
+- Workspace now has 7 tabs: Информация, КП, Сделки, Задачи, История, Комментарии, Файлы
+- Deals tab uses separate queries (no JOINs) — pipeline_stages + deals fetched in parallel, stage found via in-memory find
+- Move/delete deal operations log activities and show toast notifications
+- КП tab renamed to value="proposals" to free up value="deals" for the new Сделки tab

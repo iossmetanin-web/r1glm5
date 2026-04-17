@@ -1,18 +1,14 @@
 'use client'
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import {
   User,
   Users,
   Kanban,
   Contact,
   CheckSquare,
-  Zap,
-  Bell,
   Tag,
-  FileText,
-  Clock,
   Mail,
   Shield,
   LogOut,
@@ -23,19 +19,15 @@ import {
   Trash2,
   MoreHorizontal,
   Circle,
-  ArrowRight,
   AlertCircle,
-  Upload,
-  Search,
   Loader2,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import {
   Dialog,
@@ -70,6 +62,7 @@ import {
 } from '@/components/ui/select'
 import { supabase } from '@/lib/supabase/client'
 import { useAuthStore } from '@/lib/store'
+import { toast } from 'sonner'
 import type { LucideIcon } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -81,11 +74,7 @@ type SettingsSection =
   | 'crm'
   | 'contacts'
   | 'tasks'
-  | 'automation'
-  | 'notifications'
   | 'tags'
-  | 'files'
-  | 'logs'
 
 interface CategoryItem {
   id: SettingsSection
@@ -100,9 +89,6 @@ interface SegmentItem { id: string; name: string }
 interface CustomField { id: string; name: string; type: string }
 interface TaskStatus { id: string; name: string; color: string }
 interface TaskPriority { id: string; name: string }
-interface AutomationRule { id: string; name: string; trigger: string; action: string; enabled: boolean }
-interface NotificationItem { id: string; event: string; channel: string; enabled: boolean }
-interface FileMeta { id: string; name: string; size: string; type: string; data: string; uploaded_at: string }
 
 // ─── Settings Storage Helpers ────────────────────────────────────────────────
 
@@ -112,9 +98,6 @@ const SETTINGS_IDS: Record<string, string> = {
   custom_fields: '00000001-0000-0000-0000-000000000003',
   task_statuses: '00000001-0000-0000-0000-000000000004',
   task_priorities: '00000001-0000-0000-0000-000000000005',
-  automation_rules: '00000001-0000-0000-0000-000000000006',
-  notifications: '00000001-0000-0000-0000-000000000007',
-  files_metadata: '00000001-0000-0000-0000-000000000008',
 }
 
 async function loadSettings<T>(category: string, fallback: T): Promise<T> {
@@ -157,14 +140,6 @@ const DEFAULT_PRIORITIES: TaskPriority[] = [
   { id: '3', name: 'Низкий' },
 ]
 
-const DEFAULT_NOTIFICATIONS: NotificationItem[] = [
-  { id: '1', event: 'Новая сделка', channel: 'Push', enabled: true },
-  { id: '2', event: 'Сделка перемещена', channel: 'Push', enabled: true },
-  { id: '3', event: 'Просрочка задачи', channel: 'Email', enabled: true },
-  { id: '4', event: 'Новый комментарий', channel: 'Push', enabled: false },
-  { id: '5', event: 'Ежедневный отчёт', channel: 'Email', enabled: true },
-]
-
 // ─── Categories ──────────────────────────────────────────────────────────────
 
 const CATEGORIES: CategoryItem[] = [
@@ -173,11 +148,7 @@ const CATEGORIES: CategoryItem[] = [
   { id: 'crm', title: 'CRM', description: 'Сделки, воронки и этапы', icon: Kanban, color: 'bg-amber-500' },
   { id: 'contacts', title: 'Контакты и компании', description: 'Поля, теги и сегменты', icon: Contact, color: 'bg-emerald-500' },
   { id: 'tasks', title: 'Задачи', description: 'Статусы, приоритеты и сроки', icon: CheckSquare, color: 'bg-violet-500' },
-  { id: 'automation', title: 'Автоматизация', description: 'Правила и триггеры', icon: Zap, color: 'bg-orange-500' },
-  { id: 'notifications', title: 'Уведомления', description: 'События и каналы оповещения', icon: Bell, color: 'bg-pink-500' },
   { id: 'tags', title: 'Теги и сегменты', description: 'Категоризация клиентов', icon: Tag, color: 'bg-cyan-500' },
-  { id: 'files', title: 'Файлы', description: 'Хранилище и вложения', icon: FileText, color: 'bg-slate-500' },
-  { id: 'logs', title: 'История и логи', description: 'Действия и изменения', icon: Clock, color: 'bg-indigo-500' },
 ]
 
 // ─── Helper Components ───────────────────────────────────────────────────────
@@ -433,8 +404,40 @@ function UsersSection() {
       const res = await supabase.from('users').update({ name: formName.trim(), email: formEmail.trim(), role: formRole }).eq('id', editingUser.id)
       dbError = res.error
     } else {
-      const res = await supabase.from('users').insert({ name: formName.trim(), email: formEmail.trim(), role: formRole })
+      // Generate random password (12 chars, alphanumeric)
+      const password = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4)
+
+      // Create Supabase Auth account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formEmail.trim(),
+        password,
+      })
+
+      if (authError || !authData.user) {
+        setError('Ошибка создания аккаунта: ' + (authError?.message || 'Неизвестная ошибка'))
+        setSaving(false)
+        return
+      }
+
+      // Insert into users table with auth user's ID
+      const res = await supabase.from('users').insert({
+        id: authData.user.id,
+        name: formName.trim(),
+        email: formEmail.trim(),
+        role: formRole,
+      })
       dbError = res.error
+
+      if (!dbError) {
+        // Show password in toast so admin can share it
+        setDialogOpen(false)
+        toast.success(`Пользователь создан. Пароль: ${password}`, { duration: 10000 })
+        // Reload users
+        supabase.from('users').select('*').order('name').then(({ data: d }) => {
+          if (d) setUsers(d)
+        })
+        return
+      }
     }
 
     setSaving(false)
@@ -1288,268 +1291,6 @@ function TasksSection() {
   )
 }
 
-// ─── 6. АВТОМАТИЗАЦИЯ ─────────────────────────────────────────────────────────
-
-function AutomationSection() {
-  const [rules, setRules] = useState<AutomationRule[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [formName, setFormName] = useState('')
-  const [formTrigger, setFormTrigger] = useState('')
-  const [formAction, setFormAction] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  const [autoInitialized, setAutoInitialized] = useState(false)
-
-  if (!autoInitialized) {
-    setAutoInitialized(true)
-    loadSettings<AutomationRule[]>('automation_rules', []).then((data) => {
-      setRules(data)
-      setLoading(false)
-    })
-  }
-
-  const openAdd = () => {
-    setFormName('')
-    setFormTrigger('')
-    setFormAction('')
-    setError('')
-    setDialogOpen(true)
-  }
-
-  const handleSave = async () => {
-    if (!formName.trim()) { setError('Название не может быть пустым'); return }
-    if (!formTrigger.trim()) { setError('Триггер не может быть пустым'); return }
-    if (!formAction.trim()) { setError('Действие не может быть пустым'); return }
-
-    setSaving(true)
-    setError('')
-
-    const updated = [...rules, {
-      id: crypto.randomUUID(),
-      name: formName.trim(),
-      trigger: formTrigger.trim(),
-      action: formAction.trim(),
-      enabled: true,
-    }]
-
-    const ok = await saveSettings('automation_rules', updated)
-    setSaving(false)
-    if (!ok) { setError('Ошибка сохранения'); return }
-    setRules(updated)
-    setDialogOpen(false)
-  }
-
-  const handleToggle = async (id: string) => {
-    const updated = rules.map((r) => r.id === id ? { ...r, enabled: !r.enabled } : r)
-    setRules(updated)
-    await saveSettings('automation_rules', updated)
-  }
-
-  const handleDelete = async (id: string) => {
-    const updated = rules.filter((r) => r.id !== id)
-    await saveSettings('automation_rules', updated)
-    setRules(updated)
-  }
-
-  return (
-    <>
-      <SectionHeader icon={Zap} title="Автоматизация" description="Правила и триггеры" color="bg-orange-500" />
-
-      {error && <ErrorMessage message={error} />}
-
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-muted-foreground">{rules.length} правил</p>
-        <Button size="sm" className="rounded-xl gap-1.5" onClick={openAdd}>
-          <Plus className="h-3.5 w-3.5" />
-          Новое правило
-        </Button>
-      </div>
-
-      {loading ? (
-        <Card className="rounded-2xl border-border/60 shadow-sm"><CardContent className="p-8"><LoadingSpinner /></CardContent></Card>
-      ) : rules.length === 0 ? (
-        <Card className="rounded-2xl border-border/60 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                <Zap className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground">Создайте первое правило</p>
-                <p className="text-xs text-muted-foreground">Автоматизируйте рутинные действия в CRM</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="rounded-2xl border-border/60 shadow-sm">
-          <CardContent className="p-0">
-            {rules.map((rule, i) => (
-              <div key={rule.id}>
-                {i > 0 && <Separator className="mx-5" />}
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{rule.name}</p>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-200 shrink-0">
-                            <MoreHorizontal className="h-3.5 w-3.5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <DropdownMenuItem className="text-destructive" onSelect={(e) => e.preventDefault()}>
-                                <Trash2 className="mr-2 h-3.5 w-3.5" />
-                                Удалить
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Удалить правило?</AlertDialogTitle>
-                                <AlertDialogDescription>Это действие нельзя отменить.</AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Отмена</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(rule.id)} className="bg-destructive">Удалить</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <Switch checked={rule.enabled} onCheckedChange={() => handleToggle(rule.id)} className="ml-2" />
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Badge variant="secondary" className="text-xs">{rule.trigger}</Badge>
-                    <ArrowRight className="h-3 w-3" />
-                    <span className="truncate">{rule.action}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Add Rule Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Новое правило</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            {error && <ErrorMessage message={error} />}
-            <div className="space-y-2">
-              <Label>Название</Label>
-              <Input value={formName} onChange={(e) => { setFormName(e.target.value); setError('') }} placeholder="Введите название" />
-            </div>
-            <div className="space-y-2">
-              <Label>Триггер</Label>
-              <Input value={formTrigger} onChange={(e) => { setFormTrigger(e.target.value); setError('') }} placeholder="Когда произойдёт" />
-            </div>
-            <div className="space-y-2">
-              <Label>Действие</Label>
-              <Input value={formAction} onChange={(e) => { setFormAction(e.target.value); setError('') }} placeholder="Что сделать" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Отмена</Button>
-            <Button onClick={handleSave} disabled={saving || !formName.trim() || !formTrigger.trim() || !formAction.trim()}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Создать
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-}
-
-// ─── 7. УВЕДОМЛЕНИЯ ───────────────────────────────────────────────────────────
-
-function NotificationsSection() {
-  const [notifications, setNotifications] = useState<NotificationItem[]>([])
-  const [dndMode, setDndMode] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  const [notifInitialized, setNotifInitialized] = useState(false)
-
-  if (!notifInitialized) {
-    setNotifInitialized(true)
-    loadSettings<NotificationItem[]>('notifications', DEFAULT_NOTIFICATIONS).then((data) => {
-      setNotifications(data)
-      setLoading(false)
-    })
-  }
-
-  const handleToggle = async (id: string) => {
-    const updated = notifications.map((n) => n.id === id ? { ...n, enabled: !n.enabled } : n)
-    setNotifications(updated)
-    await saveSettings('notifications', updated)
-  }
-
-  const handleDndToggle = async (enabled: boolean) => {
-    setDndMode(enabled)
-  }
-
-  if (loading) {
-    return (
-      <>
-        <SectionHeader icon={Bell} title="Уведомления" description="События и каналы оповещения" color="bg-pink-500" />
-        <Card className="rounded-2xl border-border/60 shadow-sm"><CardContent className="p-8"><LoadingSpinner /></CardContent></Card>
-      </>
-    )
-  }
-
-  return (
-    <>
-      <SectionHeader icon={Bell} title="Уведомления" description="События и каналы оповещения" color="bg-pink-500" />
-
-      {error && <ErrorMessage message={error} />}
-
-      <Card className="rounded-2xl border-border/60 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-foreground">События</CardTitle>
-          <CardDescription className="text-xs">Настройте, о каких событиях уведомлять</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-0">
-            {notifications.map((notif, i) => (
-              <div key={notif.id}>
-                {i > 0 && <Separator className="my-0" />}
-                <div className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="text-sm text-foreground">{notif.event}</p>
-                    <p className="text-xs text-muted-foreground">{notif.channel}</p>
-                  </div>
-                  <Switch checked={notif.enabled} onCheckedChange={() => handleToggle(notif.id)} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl border-border/60 shadow-sm mt-4">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-foreground">Режим «Не беспокоить»</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Отключить все уведомления</p>
-            </div>
-            <Switch checked={dndMode} onCheckedChange={handleDndToggle} />
-          </div>
-        </CardContent>
-      </Card>
-    </>
-  )
-}
 
 // ─── 8. ТЕГИ И СЕГМЕНТЫ ──────────────────────────────────────────────────────
 
@@ -1855,290 +1596,6 @@ function TagsSection() {
   )
 }
 
-// ─── 9. ФАЙЛЫ ─────────────────────────────────────────────────────────────────
-
-function FilesSection() {
-  const [files, setFiles] = useState<FileMeta[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [uploading, setUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const [filesInitialized, setFilesInitialized] = useState(false)
-
-  if (!filesInitialized) {
-    setFilesInitialized(true)
-    loadSettings<FileMeta[]>('files_metadata', []).then((data) => {
-      setFiles(data)
-      setLoading(false)
-    })
-  }
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = e.target.files
-    if (!selectedFiles || selectedFiles.length === 0) return
-
-    setUploading(true)
-    setError('')
-
-    const newFiles: FileMeta[] = []
-
-    for (const file of Array.from(selectedFiles)) {
-      try {
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(reader.result as string)
-          reader.onerror = reject
-          reader.readAsDataURL(file)
-        })
-
-        newFiles.push({
-          id: crypto.randomUUID(),
-          name: file.name,
-          size: formatFileSize(file.size),
-          type: file.type || 'application/octet-stream',
-          data: base64,
-          uploaded_at: new Date().toISOString(),
-        })
-      } catch {
-        setError('Ошибка чтения файла: ' + file.name)
-      }
-    }
-
-    if (newFiles.length > 0) {
-      const updated = [...files, ...newFiles]
-      const ok = await saveSettings('files_metadata', updated)
-      if (ok) setFiles(updated)
-      else setError('Ошибка сохранения файлов')
-    }
-
-    setUploading(false)
-    // Reset input
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  const handleDelete = async (id: string) => {
-    const updated = files.filter((f) => f.id !== id)
-    const ok = await saveSettings('files_metadata', updated)
-    if (ok) setFiles(updated)
-    else setError('Ошибка удаления файла')
-  }
-
-  // Calculate total storage
-  const totalSize = files.reduce((acc, f) => {
-    // Try to estimate bytes from the base64 string
-    const base64Length = f.data.length - (f.data.indexOf(',') + 1)
-    return acc + Math.floor(base64Length * 3 / 4)
-  }, 0)
-
-  const storagePercent = Math.min((totalSize / (1024 * 1024 * 1024)) * 100, 100)
-  const storageMB = (totalSize / (1024 * 1024)).toFixed(1)
-
-  return (
-    <>
-      <SectionHeader icon={FileText} title="Файлы" description="Хранилище и вложения" color="bg-slate-500" />
-
-      {error && <ErrorMessage message={error} />}
-
-      <Card className="rounded-2xl border-border/60 shadow-sm">
-        <CardContent className="p-5">
-          <div
-            className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-border/60 rounded-xl cursor-pointer hover:bg-muted/30 transition-colors"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {uploading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mb-3" />
-            ) : (
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted mb-3">
-                <Upload className="h-6 w-6 text-muted-foreground" />
-              </div>
-            )}
-            <p className="text-sm font-medium text-foreground">
-              {uploading ? 'Загрузка...' : 'Загрузить файл'}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">Перетащите или нажмите для выбора</p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="*/*"
-              multiple
-              className="hidden"
-              onChange={handleFileUpload}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {loading ? (
-        <Card className="rounded-2xl border-border/60 shadow-sm mt-4"><CardContent className="p-8"><LoadingSpinner /></CardContent></Card>
-      ) : files.length > 0 ? (
-        <Card className="rounded-2xl border-border/60 shadow-sm mt-4">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-foreground">Загруженные файлы</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-0">
-              {files.map((file, i) => (
-                <div key={file.id}>
-                  {i > 0 && <Separator className="my-0" />}
-                  <div className="flex items-center gap-3 py-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted shrink-0">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-foreground truncate">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">{file.size} · {new Date(file.uploaded_at).toLocaleDateString('ru-RU')}</p>
-                    </div>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <button className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors duration-200">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Удалить файл?</AlertDialogTitle>
-                          <AlertDialogDescription>Файл «{file.name}» будет удалён навсегда.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Отмена</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(file.id)} className="bg-destructive">Удалить</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {/* Storage usage */}
-      <Card className="rounded-2xl border-border/60 shadow-sm mt-4">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-foreground">Использовано хранилища</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{storageMB} МБ из 1 ГБ</p>
-            </div>
-            <Badge variant="secondary" className="text-xs">{storagePercent.toFixed(1)}%</Badge>
-          </div>
-          <div className="mt-3 h-2 bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full transition-all duration-300" style={{ width: `${Math.max(storagePercent, 0.5)}%` }} />
-          </div>
-        </CardContent>
-      </Card>
-    </>
-  )
-}
-
-// ─── 10. ИСТОРИЯ (Logs) ──────────────────────────────────────────────────────
-
-function LogsSection() {
-  const [logs, setLogs] = useState<{ id: string; action: string; user_id: string | null; created_at: string; entity_type: string | null; entity_id: string | null; user_name?: string }[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  const [logsInitialized, setLogsInitialized] = useState(false)
-
-  const loadLogs = async () => {
-    setLoading(true)
-    const { data, error: err } = await supabase
-      .from('activities')
-      .select('*')
-      .neq('entity_type', 'settings_v1')
-      .order('created_at', { ascending: false })
-      .limit(20)
-
-    if (err) {
-      setError('Ошибка загрузки: ' + err.message)
-      setLoading(false)
-      return
-    }
-
-    // Resolve user names
-    const userIds = [...new Set((data ?? []).map((d) => d.user_id).filter(Boolean))] as string[]
-    let userMap: Record<string, string> = {}
-
-    if (userIds.length > 0) {
-      const { data: users } = await supabase.from('users').select('id, name').in('id', userIds)
-      if (users) {
-        userMap = Object.fromEntries(users.map((u) => [u.id, u.name]))
-      }
-    }
-
-    const enriched = (data ?? []).map((log) => ({
-      ...log,
-      user_name: log.user_id ? userMap[log.user_id] ?? 'Неизвестный' : 'Система',
-    }))
-
-    setLogs(enriched)
-    setLoading(false)
-  }
-
-  if (!logsInitialized) {
-    setLogsInitialized(true)
-    loadLogs()
-  }
-
-  return (
-    <>
-      <SectionHeader icon={Clock} title="История и логи" description="Действия и изменения" color="bg-indigo-500" />
-
-      {error && <ErrorMessage message={error} />}
-
-      <Card className="rounded-2xl border-border/60 shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-foreground">Последние действия</CardTitle>
-            <button
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-200"
-              onClick={loadLogs}
-            >
-              <Search className="h-4 w-4" />
-            </button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="p-8"><LoadingSpinner /></div>
-          ) : logs.length === 0 ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">Нет записей</div>
-          ) : (
-            logs.map((log, i) => (
-              <div key={log.id}>
-                {i > 0 && <Separator className="mx-5" />}
-                <div className="flex items-start gap-3 p-4">
-                  <Avatar className="h-7 w-7 mt-0.5 shrink-0">
-                    <AvatarFallback className="bg-muted text-muted-foreground text-[10px]">
-                      {log.user_name?.split(' ').map((n) => n[0]).join('').slice(0, 2) ?? '??'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground">{log.action}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {log.user_name} · {new Date(log.created_at).toLocaleDateString('ru-RU')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
-    </>
-  )
-}
-
-// ─── Utility ─────────────────────────────────────────────────────────────────
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return bytes + ' Б'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' МБ'
-}
-
 // ─── Section Router ──────────────────────────────────────────────────────────
 
 function SectionContent({ section }: { section: SettingsSection }) {
@@ -2148,16 +1605,11 @@ function SectionContent({ section }: { section: SettingsSection }) {
     case 'crm': return <CrmSection />
     case 'contacts': return <ContactsSection />
     case 'tasks': return <TasksSection />
-    case 'automation': return <AutomationSection />
-    case 'notifications': return <NotificationsSection />
     case 'tags': return <TagsSection />
-    case 'files': return <FilesSection />
-    case 'logs': return <LogsSection />
     default: return null
   }
 }
 
-// ─── Main Settings Page ──────────────────────────────────────────────────────
 
 export function SettingsPage() {
   const [activeSection, setActiveSection] = useState<SettingsSection>('main')
