@@ -187,6 +187,7 @@ export function DashboardPage() {
   const [todayTasks, setTodayTasks] = useState<Task[]>([])
   const [todayTasksTotal, setTodayTasksTotal] = useState(0)
   const [todayTasksDone, setTodayTasksDone] = useState(0)
+  const [companyMapForTasks, setCompanyMapForTasks] = useState<Map<string, string>>(new Map())
   const [companiesByStatus, setCompaniesByStatus] = useState<
     { name: string; count: number; fill: string }[]
   >([])
@@ -244,11 +245,12 @@ export function DashboardPage() {
       }
       setCompaniesBySource(Object.keys(SOURCE_COLORS).map((s) => ({ name: s, value: sourceCounts[s], fill: SOURCE_COLORS[s] })).filter((d) => d.value > 0))
 
-      // ── Tasks (optional — table may not exist yet) ─────────────────────
+      // ── Tasks (optional — separate queries, no JOINs) ───────────────
       try {
-        const [tasksRes, tasksAllRes] = await Promise.all([
+        const [tasksRes, tasksAllRes, companiesForTasksRes] = await Promise.all([
           supabase.from('tasks').select('*').neq('status', 'done').lte('deadline', today).order('priority', { ascending: false }),
           supabase.from('tasks').select('status').lte('deadline', today),
+          supabase.from('companies').select('id, name').order('name'),
         ])
         if (!tasksRes.error) {
           const taskData = (tasksRes.data as Task[]) ?? []
@@ -257,6 +259,14 @@ export function DashboardPage() {
           if (!tasksAllRes.error) {
             const doneCount = (tasksAllRes.data ?? []).filter((t) => t.status === 'done').length
             setTodayTasksDone(doneCount)
+          }
+          // Build company name map for tasks
+          if (!companiesForTasksRes.error && companiesForTasksRes.data) {
+            const map = new Map<string, string>()
+            for (const c of companiesForTasksRes.data) {
+              map.set(c.id, c.name)
+            }
+            setCompanyMapForTasks(map)
           }
         }
       } catch { /* tasks table may not exist */ }
@@ -721,9 +731,9 @@ export function DashboardPage() {
                             <Badge variant={priorityVariant} className="text-[10px] px-1.5 py-0">
                               {priorityLabel}
                             </Badge>
-                            {task.company_id && (
+                            {task.company_id && companyMapForTasks.get(task.company_id) && (
                               <span className="text-xs text-muted-foreground">
-                                ID: {task.company_id.slice(0, 8)}
+                                {companyMapForTasks.get(task.company_id)!}
                               </span>
                             )}
                             {isOverdue && (

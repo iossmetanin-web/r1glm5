@@ -31,6 +31,7 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { Plus, Search, Pencil, Trash2, Users, AlertCircle } from 'lucide-react'
+import { toast } from 'sonner'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -174,7 +175,6 @@ export default function ContactsPage() {
 
     try {
       if (editingContact) {
-        // Update
         const updates: ClientUpdate = {
           name: form.name.trim(),
           company: form.company.trim() || null,
@@ -187,16 +187,18 @@ export default function ContactsPage() {
           .update(updates)
           .eq('id', editingContact.id)
 
-        if (!updateError) {
+        if (updateError) {
+          toast.error('Ошибка: ' + updateError.message)
+        } else {
+          toast.success(`Контакт «${form.name.trim()}» обновлён`)
+          // Log activity with correct schema
           await supabase.from('activities').insert({
-            action: `Обновлён контакт «${form.name.trim()}»`,
-            entity_type: 'client',
-            entity_id: editingContact.id,
+            content: `Обновлён контакт «${form.name.trim()}»`,
+            type: 'заметка',
             user_id: currentUser?.id,
-          })
+          }).catch(() => {})
         }
       } else {
-        // Create
         const insert: ClientInsert = {
           name: form.name.trim(),
           company: form.company.trim() || null,
@@ -208,12 +210,15 @@ export default function ContactsPage() {
           .from('clients')
           .insert(insert)
 
-        if (!insertError) {
+        if (insertError) {
+          toast.error('Ошибка: ' + insertError.message)
+        } else {
+          toast.success(`Контакт «${form.name.trim()}» создан`)
           await supabase.from('activities').insert({
-            action: `Создан контакт «${form.name.trim()}»`,
-            entity_type: 'client',
+            content: `Создан контакт «${form.name.trim()}»`,
+            type: 'заметка',
             user_id: currentUser?.id,
-          })
+          }).catch(() => {})
         }
       }
 
@@ -222,7 +227,7 @@ export default function ContactsPage() {
       setForm(EMPTY_FORM)
       refresh()
     } catch {
-      // silent — refresh will show latest state
+      toast.error('Произошла ошибка при сохранении')
     }
     setSaving(false)
   }
@@ -237,13 +242,15 @@ export default function ContactsPage() {
       .delete()
       .eq('id', contact.id)
 
-    if (!deleteError) {
+    if (deleteError) {
+      toast.error('Ошибка: ' + deleteError.message)
+    } else {
+      toast.success(`Контакт «${contact.name}» удалён`)
       await supabase.from('activities').insert({
-        action: `Удалён контакт «${contact.name}»`,
-        entity_type: 'client',
-        entity_id: contact.id,
+        content: `Удалён контакт «${contact.name}»`,
+        type: 'заметка',
         user_id: currentUser?.id,
-      })
+      }).catch(() => {})
       refresh()
     }
   }

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import type { Deal, PipelineStage, Client } from '@/lib/supabase/database.types'
-import { useNavigationStore, useAuthStore, useUIStore } from '@/lib/store'
+import type { Deal, DealInsert, PipelineStage, Company } from '@/lib/supabase/database.types'
+import { useNavigationStore, useAuthStore } from '@/lib/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -31,6 +31,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { toast } from 'sonner'
 import { Plus, MoreHorizontal, Trash2, AlertCircle, Package } from 'lucide-react'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -48,10 +49,11 @@ type FilterType = 'all' | 'open' | 'won' | 'lost'
 
 export default function DealsPage() {
   const currentUser = useAuthStore((s) => s.currentUser)
-  const openDeal = useNavigationStore((s) => s.openDeal)
+  const openCompany = useNavigationStore((s) => s.openCompany)
 
   const [stages, setStages] = useState<PipelineStage[]>([])
-  const [deals, setDeals] = useState<any[]>([])
+  const [deals, setDeals] = useState<Deal[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterType>('all')
@@ -60,13 +62,12 @@ export default function DealsPage() {
   // Create deal form state
   const [newTitle, setNewTitle] = useState('')
   const [newValue, setNewValue] = useState(0)
-  const [newClientId, setNewClientId] = useState<string | null>(null)
+  const [newCompanyId, setNewCompanyId] = useState<string | null>(null)
   const [newPriority, setNewPriority] = useState('Medium')
   const [newStageId, setNewStageId] = useState<string>('')
-  const [clients, setClients] = useState<Pick<Client, 'id' | 'name' | 'company'>[]>([])
   const [creating, setCreating] = useState(false)
 
-  // ─── Data Fetching ────────────────────────────────────────────────────────
+  // ─── Data Fetching (NO JOINs — separate queries) ────────────────────────────
 
   const [fetchTrigger, setFetchTrigger] = useState(0)
 
@@ -74,28 +75,25 @@ export default function DealsPage() {
     let cancelled = false
     async function load() {
       try {
-        const [stagesRes, dealsRes] = await Promise.all([
+        // Separate queries — no fragile JOINs
+        const [stagesRes, dealsRes, companiesRes] = await Promise.all([
           supabase.from('pipeline_stages').select('*').order('position'),
-          supabase
-            .from('deals')
-            .select(
-              '*, pipeline_stages(name, color, position, is_won, is_closed), clients(name, company)'
-            )
-            .order('created_at', { ascending: false }),
+          supabase.from('deals').select('*').order('created_at', { ascending: false }),
+          supabase.from('companies').select('id, name').order('name'),
         ])
+
         if (cancelled) return
+
+        if (stagesRes.error) throw stagesRes.error
+        if (dealsRes.error) throw dealsRes.error
+
         setStages(stagesRes.data ?? [])
         setDeals(dealsRes.data ?? [])
-        if (stagesRes.error || dealsRes.error) {
-          setError(
-            stagesRes.error?.message || dealsRes.error?.message || null
-          )
-        } else {
-          setError(null)
-        }
-      } catch (err: any) {
+        setCompanies(companiesRes.data ?? [])
+        setError(null)
+      } catch (err: unknown) {
         if (cancelled) return
-        setError(err?.message || 'Не удалось загрузить данные')
+        setError(err instanceof Error ? err.message : 'Не удалось загрузить данные')
       }
       setLoading(false)
     }
@@ -108,29 +106,24 @@ export default function DealsPage() {
     setFetchTrigger((n) => n + 1)
   }
 
-  useEffect(() => {
-    if (!createOpen) return
-    let cancelled = false
-    async function loadClients() {
-      const { data } = await supabase
-        .from('clients')
-        .select('id, name, company')
-        .order('name')
-      if (data && !cancelled) setClients(data)
-    }
-    loadClients()
-    return () => { cancelled = true }
-  }, [createOpen])
+  // ─── Computed maps ─────────────────────────────────────────────────────────
+
+  const stageMap = new Map<string, PipelineStage>()
+  for (const s of stages) stageMap.set(s.id, s)
+
+  const companyMap = new Map<string, Company>()
+  for (const c of companies) companyMap.set(c.id, c)
 
   // ─── Filter Logic ─────────────────────────────────────────────────────────
 
   const filteredDeals = deals.filter((deal) => {
+    const stage = stageMap.get(deal.stage_id)
     if (filter === 'all') return true
     if (filter === 'open') {
-      return !deal.pipeline_stages?.is_won && !deal.pipeline_stages?.is_closed
+      return stage && !stage.is_won && !stage.is_closed
     }
-    if (filter === 'won') return deal.pipeline_stages?.is_won === true
-    if (filter === 'lost') return deal.pipeline_stages?.is_closed === true && !deal.pipeline_stages?.is_won
+    if (filter === 'won') return stage && stage.is_won === true
+    if (filter === 'lost') return stage && stage.is_closed === true && !stage.is_won
     return true
   })
 
@@ -142,7 +135,7 @@ export default function DealsPage() {
 
   // ─── Move Deal ────────────────────────────────────────────────────────────
 
-  const moveDeal = async (deal: any, newIndex: number) => {
+  const moveDeal = async (deal: Deal, newIndex: number) => {
     if (newIndex < 0 || newIndex >= stages.length) return
     const newStage = stages[newIndex]
     const { error } = await supabase
@@ -150,19 +143,21 @@ export default function DealsPage() {
       .update({ stage_id: newStage.id })
       .eq('id', deal.id)
     if (!error) {
+      toast.success(`Сделка «${deal.title}» перемещена в «${newStage.name}»`)
       await supabase.from('activities').insert({
-        action: `Перемещена сделка «${deal.title}» в ${newStage.name}`,
-        entity_type: 'deal',
-        entity_id: deal.id,
+        content: `Перемещена сделка «${deal.title}» в ${newStage.name}`,
+        type: 'заметка',
         user_id: currentUser?.id,
-      })
+      } as any).catch(() => {})
       fetchData()
+    } else {
+      toast.error('Ошибка: ' + error.message)
     }
   }
 
   // ─── Delete Deal ──────────────────────────────────────────────────────────
 
-  const deleteDeal = async (deal: any) => {
+  const deleteDeal = async (deal: Deal) => {
     if (!window.confirm(`Удалить "${deal.title}"? Это действие нельзя отменить.`))
       return
     const { error } = await supabase
@@ -170,13 +165,15 @@ export default function DealsPage() {
       .delete()
       .eq('id', deal.id)
     if (!error) {
+      toast.success(`Сделка «${deal.title}» удалена`)
       await supabase.from('activities').insert({
-        action: `Удалена сделка «${deal.title}»`,
-        entity_type: 'deal',
-        entity_id: deal.id,
+        content: `Удалена сделка «${deal.title}»`,
+        type: 'заметка',
         user_id: currentUser?.id,
-      })
+      } as any).catch(() => {})
       fetchData()
+    } else {
+      toast.error('Ошибка: ' + error.message)
     }
   }
 
@@ -187,33 +184,37 @@ export default function DealsPage() {
     setCreating(true)
     const stageId = newStageId || stages[0]?.id
     if (!stageId) {
+      toast.error('Нет этапов воронки. Создайте их в Настройках → CRM.')
       setCreating(false)
       return
     }
     const { error } = await supabase.from('deals').insert({
       title: newTitle.trim(),
       value: newValue || 0,
-      client_id: newClientId || null,
+      client_id: newCompanyId || null,
       priority: newPriority,
       stage_id: stageId,
       owner_id: currentUser?.id,
       status: 'open',
       currency: 'RUB',
       pipeline_id: stages[0]?.pipeline_id || '',
-    })
+    } as DealInsert)
     if (!error) {
+      toast.success(`Сделка «${newTitle.trim()}» создана`)
       await supabase.from('activities').insert({
-        action: `Создана сделка «${newTitle.trim()}»`,
-        entity_type: 'deal',
+        content: `Создана сделка «${newTitle.trim()}» на ${formatCurrency(newValue || 0)}`,
+        type: 'заметка',
         user_id: currentUser?.id,
-      })
+      } as any).catch(() => {})
       setNewTitle('')
       setNewValue(0)
-      setNewClientId(null)
+      setNewCompanyId(null)
       setNewPriority('Medium')
       setNewStageId('')
       setCreateOpen(false)
       fetchData()
+    } else {
+      toast.error('Ошибка: ' + error.message)
     }
     setCreating(false)
   }
@@ -221,7 +222,7 @@ export default function DealsPage() {
   const openCreateDialog = () => {
     setNewTitle('')
     setNewValue(0)
-    setNewClientId(null)
+    setNewCompanyId(null)
     setNewPriority('Medium')
     setNewStageId(stages[0]?.id || '')
     setCreateOpen(true)
@@ -242,7 +243,7 @@ export default function DealsPage() {
             {deals.length}{' '}
             {deals.length === 1 ? 'сделка' : deals.length < 5 ? 'сделки' : 'сделок'} &middot;{' '}
             {formatCurrency(
-              deals.reduce((sum: number, d: any) => sum + (d.value || 0), 0)
+              deals.reduce((sum, d) => sum + (d.value || 0), 0)
             )}{' '}
             всего
           </p>
@@ -250,17 +251,22 @@ export default function DealsPage() {
         <div className="flex items-center gap-2 flex-wrap">
           {/* Filter Buttons */}
           <div className="flex items-center gap-1 bg-muted/60 rounded-xl p-1">
-            {(['all', 'open', 'won', 'lost'] as FilterType[]).map((f) => (
+            {([
+              { key: 'all', label: 'Все' },
+              { key: 'open', label: 'Открытые' },
+              { key: 'won', label: 'Выигранные' },
+              { key: 'lost', label: 'Проигранные' },
+            ] as const).map((f) => (
               <button
-                key={f}
-                onClick={() => setFilter(f)}
+                key={f.key}
+                onClick={() => setFilter(f.key as FilterType)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  filter === f
-                    ? 'bg-amber-500 text-white shadow-sm shadow-primary/20'
+                  filter === f.key
+                    ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
                     : 'text-muted-foreground hover:text-foreground hover:bg-primary/5'
                 }`}
               >
-                {f === 'all' ? 'Все' : f === 'open' ? 'Открытые' : f === 'won' ? 'Выигранные' : 'Проигранные'}
+                {f.label}
               </button>
             ))}
           </div>
@@ -316,12 +322,27 @@ export default function DealsPage() {
         </div>
       )}
 
+      {/* ── Empty state ──────────────────────────────────────────────────── */}
+      {!loading && !error && stages.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <div className="h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center">
+            <Package className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <div className="text-center">
+            <p className="text-base font-medium text-foreground">Нет этапов воронки</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Сначала создайте этапы в Настройках → CRM
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Kanban Board ───────────────────────────────────────────────────── */}
-      {!loading && !error && (
+      {!loading && !error && stages.length > 0 && (
         <div className="flex gap-4 overflow-x-auto pb-2 flex-1">
           {dealsByStage.map(({ stage, deals: stageDeals }, stageIndex) => {
             const stageValue = stageDeals.reduce(
-              (sum: number, d: any) => sum + (d.value || 0),
+              (sum, d) => sum + (d.value || 0),
               0
             )
             return (
@@ -357,82 +378,87 @@ export default function DealsPage() {
                         Пусто
                       </div>
                     )}
-                    {stageDeals.map((deal) => (
-                      <Card
-                        key={deal.id}
-                        className="border-l-4 cursor-pointer rounded-xl shadow-sm transition-all duration-200 hover:shadow-md active:scale-[0.99] bg-card"
-                        style={{
-                          borderLeftColor: stage.color || '#888',
-                        }}
-                        onClick={() => openDeal(deal.id)}
-                      >
-                        <CardContent className="p-3">
-                          <p className="text-sm font-medium truncate">
-                            {deal.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {formatCurrency(deal.value)}
-                          </p>
-                          {deal.clients && (
-                            <p className="text-xs text-muted-foreground truncate">
-                              {deal.clients.company || deal.clients.name}
+                    {stageDeals.map((deal) => {
+                      const dealCompany = deal.client_id ? companyMap.get(deal.client_id) : null
+                      return (
+                        <Card
+                          key={deal.id}
+                          className="border-l-4 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md active:scale-[0.99] bg-card cursor-pointer"
+                          style={{
+                            borderLeftColor: stage.color || '#888',
+                          }}
+                          onClick={() => {
+                            if (deal.client_id) openCompany(deal.client_id)
+                          }}
+                        >
+                          <CardContent className="p-3">
+                            <p className="text-sm font-medium truncate">
+                              {deal.title}
                             </p>
-                          )}
-                          <div className="flex items-center justify-between mt-2">
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] capitalize"
-                            >
-                              {deal.priority || 'none'}
-                            </Badge>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  moveDeal(deal, stageIndex - 1)
-                                }}
-                                disabled={stageIndex === 0}
-                                className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground disabled:opacity-30 transition-colors"
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {formatCurrency(deal.value)}
+                            </p>
+                            {dealCompany && (
+                              <p className="text-xs text-muted-foreground truncate">
+                                {dealCompany.name}
+                              </p>
+                            )}
+                            <div className="flex items-center justify-between mt-2">
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] capitalize"
                               >
-                                &lsaquo;
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  moveDeal(deal, stageIndex + 1)
-                                }}
-                                disabled={stageIndex === stages.length - 1}
-                                className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground disabled:opacity-30 transition-colors"
-                              >
-                                &rsaquo;
-                              </button>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <button
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"
-                                  >
-                                    <MoreHorizontal className="h-3.5 w-3.5" />
-                                  </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    className="text-destructive focus:text-destructive"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      deleteDeal(deal)
-                                    }}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5 mr-2" />
-                                    Удалить
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                                {deal.priority || 'medium'}
+                              </Badge>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    moveDeal(deal, stageIndex - 1)
+                                  }}
+                                  disabled={stageIndex === 0}
+                                  className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground disabled:opacity-30 transition-colors"
+                                >
+                                  &lsaquo;
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    moveDeal(deal, stageIndex + 1)
+                                  }}
+                                  disabled={stageIndex === stages.length - 1}
+                                  className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground disabled:opacity-30 transition-colors"
+                                >
+                                  &rsaquo;
+                                </button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="h-6 w-6 rounded hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"
+                                    >
+                                      <MoreHorizontal className="h-3.5 w-3.5" />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        deleteDeal(deal)
+                                      }}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                      Удалить
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
                   </div>
                 </ScrollArea>
               </div>
@@ -481,23 +507,23 @@ export default function DealsPage() {
               />
             </div>
 
-            {/* Client */}
+            {/* Company */}
             <div className="space-y-2">
-              <Label>Клиент</Label>
+              <Label>Клиент (компания)</Label>
               <Select
-                value={newClientId || '__none__'}
+                value={newCompanyId || '__none__'}
                 onValueChange={(v) =>
-                  setNewClientId(v === '__none__' ? null : v)
+                  setNewCompanyId(v === '__none__' ? null : v)
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Выберите клиента (необязательно)" />
+                  <SelectValue placeholder="Выберите компанию (необязательно)" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Нет</SelectItem>
-                  {clients.map((c) => (
+                  {companies.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.company || c.name}
+                      {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
