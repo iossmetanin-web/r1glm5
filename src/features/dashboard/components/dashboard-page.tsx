@@ -204,166 +204,78 @@ export function DashboardPage() {
     setLoading(true)
     setError(null)
 
+    const today = getTodayString()
+    const monthStart = getMonthStartString()
+    const threeDaysAgo = getThreeDaysAgoString()
+
     try {
-      const today = getTodayString()
-      const monthStart = getMonthStartString()
-      const threeDaysAgo = getThreeDaysAgoString()
+      // ── Companies (core data — must succeed) ──────────────────────────
+      const [companiesCountRes, companiesNewRes, overdueRes, proposalsRes, activeProposalsRes] =
+        await Promise.all([
+          supabase.from('companies').select('*', { count: 'exact', head: true }),
+          supabase.from('companies').select('*', { count: 'exact', head: true }).gte('created_at', monthStart),
+          supabase.from('companies').select('*', { count: 'exact', head: true }).not('next_contact_date', 'is', null).lt('next_contact_date', threeDaysAgo),
+          supabase.from('proposals').select('total_amount').neq('status', 'отклонено'),
+          supabase.from('proposals').select('*', { count: 'exact', head: true }).neq('status', 'отклонено'),
+        ])
 
-      // Run all queries in parallel
-      const [
-        companiesCountRes,
-        companiesNewRes,
-        overdueRes,
-        proposalsRes,
-        activeProposalsRes,
-        tasksRes,
-        tasksAllRes,
-        activitiesRes,
-      ] = await Promise.all([
-        // 1. Total companies count
-        supabase
-          .from('companies')
-          .select('*', { count: 'exact', head: true }),
-
-        // 2. New companies this month
-        supabase
-          .from('companies')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', monthStart),
-
-        // 3. Overdue contacts (next_contact_date older than 3 days ago)
-        supabase
-          .from('companies')
-          .select('*', { count: 'exact', head: true })
-          .not('next_contact_date', 'is', null)
-          .lt('next_contact_date', threeDaysAgo),
-
-        // 4. Funnel amount — proposals where status != отклонено
-        supabase
-          .from('proposals')
-          .select('total_amount')
-          .neq('status', 'отклонено'),
-
-        // 5. Active proposals count (status != отклонено)
-        supabase
-          .from('proposals')
-          .select('*', { count: 'exact', head: true })
-          .neq('status', 'отклонено'),
-
-        // 6. Today's tasks (deadline today or overdue, not done)
-        supabase
-          .from('tasks')
-          .select('*, company:companies!company_id(id, name)')
-          .neq('status', 'done')
-          .lte('deadline', today)
-          .order('priority', { ascending: false }),
-
-        // 7. Today's tasks total count (for done calculation)
-        supabase
-          .from('tasks')
-          .select('status')
-          .lte('deadline', today),
-
-        // 8. Last 10 activities with user info
-        supabase
-          .from('activities')
-          .select('*, user:users!user_id(id, name)')
-          .order('created_at', { ascending: false })
-          .limit(10),
-      ])
-
-      // Error checks
       if (companiesCountRes.error) throw companiesCountRes.error
-      if (companiesNewRes.error) throw companiesNewRes.error
-      if (overdueRes.error) throw overdueRes.error
       if (proposalsRes.error) throw proposalsRes.error
-      if (activeProposalsRes.error) throw activeProposalsRes.error
-      if (tasksRes.error) throw tasksRes.error
-      if (tasksAllRes.error) throw tasksAllRes.error
-      if (activitiesRes.error) throw activitiesRes.error
 
-      // 1. Total companies
       setTotalCompanies(companiesCountRes.count ?? 0)
-
-      // 2. New this month
       setNewThisMonth(companiesNewRes.count ?? 0)
-
-      // 3. Overdue contacts
       setOverdueCount(overdueRes.count ?? 0)
-
-      // 4. Funnel amount
       const proposals = proposalsRes.data ?? []
-      const total = proposals.reduce((sum, p) => sum + (p.total_amount ?? 0), 0)
-      setFunnelAmount(total)
-
-      // 5. Active proposals count
+      setFunnelAmount(proposals.reduce((sum, p) => sum + (p.total_amount ?? 0), 0))
       setActiveProposals(activeProposalsRes.count ?? 0)
 
-      // 6. Today's tasks
-      const taskData = (tasksRes.data as unknown as TaskWithCompany[]) ?? []
-      setTodayTasks(taskData)
-      setTodayTasksTotal(taskData.length)
-
-      // 7. Tasks done count
-      const allTasks = tasksAllRes.data ?? []
-      const doneCount = allTasks.filter((t) => t.status === 'done').length
-      setTodayTasksDone(doneCount)
-
-      // 8. Activities
-      const actData = (activitiesRes.data as unknown as ActivityWithUser[]) ?? []
-      setActivities(actData)
-
-      // ── Compute chart data from companies ──────────────────────────────
-      // Fetch all companies grouped by status and source for charts
+      // ── Chart data ─────────────────────────────────────────────────────
       const [companiesByStatusRes, companiesBySourceRes] = await Promise.all([
         supabase.from('companies').select('status'),
         supabase.from('companies').select('source'),
       ])
 
-      if (companiesByStatusRes.error) throw companiesByStatusRes.error
-      if (companiesBySourceRes.error) throw companiesBySourceRes.error
-
-      // Bar chart — companies by status
       const statusCounts: Record<string, number> = {}
-      for (const s of STATUS_ORDER) {
-        statusCounts[s] = 0
-      }
+      for (const s of STATUS_ORDER) statusCounts[s] = 0
       for (const c of companiesByStatusRes.data ?? []) {
-        if (c.status && statusCounts[c.status] !== undefined) {
-          statusCounts[c.status]++
-        }
+        if (c.status && statusCounts[c.status] !== undefined) statusCounts[c.status]++
       }
-      setCompaniesByStatus(
-        STATUS_ORDER.map((s) => ({
-          name: s,
-          count: statusCounts[s],
-          fill: STATUS_COLORS[s],
-        })),
-      )
+      setCompaniesByStatus(STATUS_ORDER.map((s) => ({ name: s, count: statusCounts[s], fill: STATUS_COLORS[s] })))
 
-      // Pie chart — companies by source
       const sourceCounts: Record<string, number> = {}
-      for (const s of Object.keys(SOURCE_COLORS)) {
-        sourceCounts[s] = 0
-      }
+      for (const s of Object.keys(SOURCE_COLORS)) sourceCounts[s] = 0
       for (const c of companiesBySourceRes.data ?? []) {
-        if (c.source && sourceCounts[c.source] !== undefined) {
-          sourceCounts[c.source]++
-        }
+        if (c.source && sourceCounts[c.source] !== undefined) sourceCounts[c.source]++
       }
-      setCompaniesBySource(
-        Object.keys(SOURCE_COLORS)
-          .map((s) => ({
-            name: s,
-            value: sourceCounts[s],
-            fill: SOURCE_COLORS[s],
-          }))
-          .filter((d) => d.value > 0),
-      )
+      setCompaniesBySource(Object.keys(SOURCE_COLORS).map((s) => ({ name: s, value: sourceCounts[s], fill: SOURCE_COLORS[s] })).filter((d) => d.value > 0))
+
+      // ── Tasks (optional — table may not exist yet) ─────────────────────
+      try {
+        const [tasksRes, tasksAllRes] = await Promise.all([
+          supabase.from('tasks').select('*, company:companies!company_id(id, name)').neq('status', 'done').lte('deadline', today).order('priority', { ascending: false }),
+          supabase.from('tasks').select('status').lte('deadline', today),
+        ])
+        if (!tasksRes.error) {
+          const taskData = (tasksRes.data as unknown as TaskWithCompany[]) ?? []
+          setTodayTasks(taskData)
+          setTodayTasksTotal(taskData.length)
+          if (!tasksAllRes.error) {
+            const doneCount = (tasksAllRes.data ?? []).filter((t) => t.status === 'done').length
+            setTodayTasksDone(doneCount)
+          }
+        }
+      } catch { /* tasks table may not exist */ }
+
+      // ── Activities (optional — users table may not be accessible) ──────
+      try {
+        const activitiesRes = await supabase.from('activities').select('*, user:users!user_id(id, name)').order('created_at', { ascending: false }).limit(10)
+        if (!activitiesRes.error) {
+          setActivities((activitiesRes.data as unknown as ActivityWithUser[]) ?? [])
+        }
+      } catch { /* activities/users may not be accessible */ }
+
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Не удалось загрузить данные',
-      )
+      setError(err instanceof Error ? err.message : 'Не удалось загрузить данные')
     } finally {
       setLoading(false)
     }
