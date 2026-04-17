@@ -27,12 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Dialog,
-  DialogContent,
-} from '@/components/ui/dialog'
 import { useAuthStore, useNavigationStore, useUIStore } from '@/lib/store'
-import { useNavigate } from 'next/navigation'
 import { toast } from 'sonner'
 import type { LucideIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
@@ -66,8 +61,6 @@ export function Header() {
   const openCompany = useNavigationStore((s) => s.openCompany)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
-  const nextNavigate = useNavigate()
-
   const userInitials = currentUser?.name
     ? currentUser.name
         .split(' ')
