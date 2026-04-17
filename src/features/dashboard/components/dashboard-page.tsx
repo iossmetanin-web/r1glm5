@@ -261,13 +261,24 @@ export function DashboardPage() {
         }
       } catch { /* tasks table may not exist */ }
 
-      // ── Activities (optional — users table may not be accessible) ──────
+      // ── Activities (no JOIN — safe separate queries) ──────────────────
       try {
-        const activitiesRes = await supabase.from('activities').select('*, user:users!user_id(id, name)').order('created_at', { ascending: false }).limit(10)
+        const [activitiesRes, usersRes] = await Promise.all([
+          supabase.from('activities').select('*').order('created_at', { ascending: false }).limit(10),
+          supabase.from('users').select('id, name'),
+        ])
         if (!activitiesRes.error) {
-          setActivities((activitiesRes.data as unknown as ActivityWithUser[]) ?? [])
+          const userMap = new Map<string, { id: string; name: string } | null>()
+          if (!usersRes.error && usersRes.data) {
+            for (const u of usersRes.data) userMap.set(u.id, { id: u.id, name: u.name })
+          }
+          const activitiesWithUser: ActivityWithUser[] = (activitiesRes.data ?? []).map((a: any) => ({
+            ...a,
+            user: a.user_id ? (userMap.get(a.user_id) ?? null) : null,
+          }))
+          setActivities(activitiesWithUser)
         }
-      } catch { /* activities/users may not be accessible */ }
+      } catch { /* activities optional */ }
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось загрузить данные')

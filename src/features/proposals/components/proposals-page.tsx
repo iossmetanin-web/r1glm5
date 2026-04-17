@@ -49,6 +49,7 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table'
+import { toast } from 'sonner'
 import {
   Plus,
   Pencil,
@@ -310,15 +311,18 @@ export function ProposalsPage() {
       .update({ status: newStatus })
       .eq('id', proposal.id)
 
-    if (!updateError) {
-      await supabase.from('activities').insert({
-        company_id: proposal.company_id,
-        user_id: currentUser?.id,
-        type: 'статус_изменен',
-        content: `КП${proposal.number ? ` №${proposal.number}` : ''}: статус изменён с «${oldStatus}» на «${newStatus}»`,
-      })
-      refresh()
+    if (updateError) {
+      toast.error('Ошибка: ' + updateError.message)
+      return
     }
+    toast.success(`Статус КП изменён на «${newStatus}»`)
+    await supabase.from('activities').insert({
+      company_id: proposal.company_id,
+      user_id: currentUser?.id,
+      type: 'статус_изменен',
+      content: `КП${proposal.number ? ` №${proposal.number}` : ''}: статус изменён с «${oldStatus}» на «${newStatus}»`,
+    }).catch(() => {})
+    refresh()
   }
 
   // ─── Delete ──────────────────────────────────────────────────────────────
@@ -332,18 +336,21 @@ export function ProposalsPage() {
       .delete()
       .eq('id', proposal.id)
 
-    if (!error) {
-      // Also delete related items
-      await supabase.from('proposal_items').delete().eq('proposal_id', proposal.id)
-      await supabase.from('activities').insert({
-        company_id: proposal.company_id,
-        user_id: currentUser?.id,
-        type: 'статус_изменен',
-        content: `Удалено ${label} для «${companyMap.get(proposal.company_id)?.name || '—'}»`,
-      })
-      if (expandedId === proposal.id) setExpandedId(null)
-      refresh()
+    if (error) {
+      toast.error('Ошибка: ' + error.message)
+      return
     }
+    toast.success(`${label} удалено`)
+    // Also delete related items
+    await supabase.from('proposal_items').delete().eq('proposal_id', proposal.id).catch(() => {})
+    await supabase.from('activities').insert({
+      company_id: proposal.company_id,
+      user_id: currentUser?.id,
+      type: 'статус_изменен',
+      content: `Удалено ${label} для «${companyMap.get(proposal.company_id)?.name || '—'}»`,
+    }).catch(() => {})
+    if (expandedId === proposal.id) setExpandedId(null)
+    refresh()
   }
 
   // ─── Create / Edit Dialog ────────────────────────────────────────────────
@@ -490,9 +497,10 @@ export function ProposalsPage() {
       setDialogOpen(false)
       setEditingProposal(null)
       setForm(EMPTY_FORM)
+      toast.success(editingProposal ? 'КП обновлено' : 'КП создано')
       refresh()
-    } catch {
-      // silent
+    } catch (err) {
+      toast.error('Произошла ошибка при сохранении')
     }
     setSaving(false)
   }

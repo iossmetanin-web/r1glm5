@@ -247,8 +247,16 @@ export function Header() {
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Поиск..."
-            className="h-9 w-56 rounded-lg border-border/50 bg-muted/40 pl-8 text-sm placeholder:text-muted-foreground/60 focus-visible:ring-primary/30 transition-all duration-200"
+            placeholder="Поиск... ⌘K"
+            className="h-9 w-56 rounded-lg border-border/50 bg-muted/40 pl-8 text-sm placeholder:text-muted-foreground/60 focus-visible:ring-primary/30 transition-all duration-200 cursor-pointer"
+            readOnly
+            onClick={openSearch}
+            onKeyDown={(e) => {
+              if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault()
+                openSearch()
+              }
+            }}
           />
         </div>
 

@@ -323,7 +323,9 @@ export function WorkspacePage() {
   const toggleTask = async (task: Task) => {
     const newStatus = task.status === 'done' ? 'todo' : 'done'
     const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', task.id)
-    if (!error) {
+    if (error) {
+      toast.error('Ошибка: ' + error.message)
+    } else {
       toast.success(newStatus === 'done' ? 'Задача выполнена' : 'Задача возвращена в работу')
       refresh()
     }
@@ -332,7 +334,9 @@ export function WorkspacePage() {
   const deleteTask = async (taskId: string) => {
     if (!window.confirm('Удалить задачу?')) return
     const { error } = await supabase.from('tasks').delete().eq('id', taskId)
-    if (!error) {
+    if (error) {
+      toast.error('Ошибка: ' + error.message)
+    } else {
       toast.success('Задача удалена')
       refresh()
     }

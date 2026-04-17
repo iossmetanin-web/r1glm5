@@ -34,6 +34,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { toast } from 'sonner'
 import {
   Plus,
   MoreHorizontal,
@@ -326,7 +327,11 @@ export default function TasksPage() {
       .update({ status: newStatus })
       .eq('id', task.id)
 
-    if (updateError) return
+    if (updateError) {
+      toast.error('Ошибка: ' + updateError.message)
+      return
+    }
+    toast.success(newStatus === 'done' ? 'Задача выполнена' : 'Задача возвращена в работу')
 
     // Log activity
     await supabase.from('activities').insert({
@@ -421,12 +426,15 @@ export default function TasksPage() {
           })
           .eq('id', editingTask.id)
 
-        if (!updateError) {
+        if (updateError) {
+          toast.error('Ошибка: ' + updateError.message)
+        } else {
+          toast.success('Задача обновлена')
           await supabase.from('activities').insert({
             content: `Обновлена задача «${form.title.trim()}»`,
             type: 'заметка',
             user_id: currentUser?.id,
-          })
+          }).catch(() => {})
         }
       } else {
         const { error: insertError } = await supabase
@@ -444,12 +452,15 @@ export default function TasksPage() {
             is_shared: form.is_shared || null,
           })
 
-        if (!insertError) {
+        if (insertError) {
+          toast.error('Ошибка: ' + insertError.message)
+        } else {
+          toast.success('Задача создана')
           await supabase.from('activities').insert({
             content: `Создана задача «${form.title.trim()}»`,
             type: 'заметка',
             user_id: currentUser?.id,
-          })
+          }).catch(() => {})
         }
       }
 
@@ -457,8 +468,8 @@ export default function TasksPage() {
       setEditingTask(null)
       setForm(EMPTY_FORM)
       refresh()
-    } catch {
-      // silent — refresh will show latest state
+    } catch (err) {
+      toast.error('Произошла ошибка при сохранении')
     }
     setSaving(false)
   }
@@ -473,12 +484,15 @@ export default function TasksPage() {
       .update({ status: 'in_progress' })
       .eq('id', task.id)
 
-    if (!error) {
+    if (error) {
+      toast.error('Ошибка: ' + error.message)
+    } else {
+      toast.success('Задача взята в работу')
       await supabase.from('activities').insert({
         content: `Задача «${task.title}» взята в работу`,
         type: 'заметка',
         user_id: currentUser?.id,
-      })
+      }).catch(() => {})
       refresh()
     }
   }
@@ -493,12 +507,15 @@ export default function TasksPage() {
       .delete()
       .eq('id', task.id)
 
-    if (!deleteError) {
+    if (deleteError) {
+      toast.error('Ошибка: ' + deleteError.message)
+    } else {
+      toast.success('Задача удалена')
       await supabase.from('activities').insert({
         content: `Удалена задача «${task.title}»`,
         type: 'заметка',
         user_id: currentUser?.id,
-      })
+      }).catch(() => {})
       refresh()
     }
   }
