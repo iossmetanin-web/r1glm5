@@ -341,3 +341,59 @@ Stage Summary:
 - All imported company/proposal records will now show their manager names from the `manager_name` column
 - No logic changes, no backend changes
 - Lint passes cleanly
+
+---
+Task ID: 3-b
+Agent: subagent
+Task: Fix fragile Supabase foreign key joins across all CRM pages
+
+Work Log:
+- Read worklog.md for context from previous tasks (1 through 3-a)
+- Audited 3 CRM page components for fragile Supabase join patterns
+
+### File 1: companies-page.tsx
+**Bug**: `Promise.all` with two queries — if the `users` table join or query fails, NO data loads (error kills everything). The `manager:users!manager_id(id, name, email)` join is fragile because `users` table may have RLS issues.
+**Fix**: 
+- Removed `manager:users!manager_id(id, name, email)` join from companies query → now uses `select('*')` only
+- Split `Promise.all` into two independent try/catch blocks
+- Companies query is critical (error sets page error state)
+- Managers query is optional (failure silently ignored — only used for create/edit dialog dropdown)
+- `manager_name` field already exists on company row from Excel import, so display still works via existing fallback: `company.manager?.name || company.manager_name || '—'`
+
+### File 2: proposals-page.tsx
+**Bug**: Same `Promise.all` pattern with TWO fragile joins: `company:companies!company_id(...)` and `manager:users!manager_id(...)`. If either fails, the entire page shows an error and no proposals load.
+**Fix**:
+- Removed both joins from proposals query → now uses `select('*')` only
+- Companies query changed from `select('id, name')` to `select('id, name, inn, city')` for full lookup
+- Split into two independent try/catch blocks (proposals critical, companies optional)
+- Added `companyMap` useMemo that builds `Map<string, {id, name, inn, city}>` from companies array
+- Replaced ALL 6 `proposal.company?.name` references with `companyMap.get(proposal.company_id)?.name`
+- Replaced ALL `proposal.company?.inn` and `proposal.company?.city` with companyMap lookups
+- Locations fixed: desktop table (line 747), desktop expanded detail (lines 859/861/866), mobile card (line 1007), mobile expanded detail (lines 1072/1074/1077), delete activity log (line 342)
+- `manager_name` fallback already in place from task 3-a: `proposal.manager?.name || proposal.manager_name || '—'`
+
+### File 3: company-detail-page.tsx
+**Bug**: `Promise.all` with 5 queries — any single failure kills the entire page. Two queries had fragile `users` table joins:
+- Company query: `select('*, manager:users!manager_id(id, name, email)')`
+- Activities query: `select('*, user:users!user_id(id, name), contact:company_contacts(id, name, position)')`
+**Fix**:
+- Split `Promise.all` into 5 independent try/catch blocks
+- Company query: removed `manager:users!manager_id` join → now `select('*')` only. `manager_name` field on company row handles display.
+- Activities query: removed BOTH `user:users!user_id` and `contact:company_contacts` joins → now `select('*')` only. User/contact names won't display in timeline (gracefully degrades — `{activity.user && (...)}` check already present).
+- Proposals query: kept `items:proposal_items(*)` join (safe — direct FK within same company, not users table dependent)
+- Contacts and Tasks queries: unchanged (no joins)
+- Only company query failure sets error state; all other 4 queries fail silently
+
+### Error display
+All 3 pages already have `err instanceof Error ? err.message : 'fallback text'` pattern from previous tasks. Full Supabase error details are now visible for debugging since error messages propagate correctly.
+
+- Ran lint: 0 errors
+
+Stage Summary:
+- 3 files modified, all fragile `users` table joins removed
+- All pages now use independent try/catch per query — failure of one query does NOT prevent other data from loading
+- Companies page: companies query critical, managers optional
+- Proposals page: proposals query critical, companies lookup optional, companyMap for display
+- Company detail: company query critical, contacts/activities/proposals/tasks all optional
+- Display gracefully degrades when joins removed (manager_name fallback, optional chaining)
+- Lint passes cleanly

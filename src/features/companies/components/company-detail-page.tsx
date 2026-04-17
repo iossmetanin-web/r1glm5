@@ -274,26 +274,53 @@ export function CompanyDetailPage() {
 
   const fetchData = useCallback(async () => {
     if (!companyId) return
-    try {
-      const [companyRes, contactsRes, activitiesRes, proposalsRes, tasksRes] = await Promise.all([
-        supabase.from('companies').select('*, manager:users!manager_id(id, name, email)').eq('id', companyId).single(),
-        supabase.from('company_contacts').select('*').eq('company_id', companyId).order('is_primary', { ascending: false }),
-        supabase.from('activities').select('*, user:users!user_id(id, name), contact:company_contacts(id, name, position)').eq('company_id', companyId).order('created_at', { ascending: false }).limit(50),
-        supabase.from('proposals').select('*, items:proposal_items(*)').eq('company_id', companyId).order('created_at', { ascending: false }),
-        supabase.from('tasks').select('*').eq('company_id', companyId).order('created_at', { ascending: false }),
-      ])
 
-      if (companyRes.error) throw companyRes.error
-      setCompany(companyRes.data)
-      setContacts(contactsRes.data ?? [])
-      setActivities(activitiesRes.data ?? [])
-      setProposals(proposalsRes.data ?? [])
-      setTasks(tasksRes.data ?? [])
-      setError(null)
+    let loadError: string | null = null
+    let companyData: typeof company = null
+    let contactsData: CompanyContact[] = []
+    let activitiesData: typeof activities = []
+    let proposalsData: typeof proposals = []
+    let tasksData: Task[] = []
+
+    // Company query — critical
+    try {
+      const res = await supabase.from('companies').select('*').eq('id', companyId).single()
+      if (res.error) throw res.error
+      companyData = res.data
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Не удалось загрузить данные компании'
-      setError(message)
+      loadError = err instanceof Error ? err.message : 'Не удалось загрузить данные компании'
     }
+
+    // Contacts query — optional
+    try {
+      const res = await supabase.from('company_contacts').select('*').eq('company_id', companyId).order('is_primary', { ascending: false })
+      if (!res.error) contactsData = res.data ?? []
+    } catch { /* contacts optional */ }
+
+    // Activities query — optional (no joins to avoid users table failures)
+    try {
+      const res = await supabase.from('activities').select('*').eq('company_id', companyId).order('created_at', { ascending: false }).limit(50)
+      if (!res.error) activitiesData = res.data ?? []
+    } catch { /* activities optional */ }
+
+    // Proposals query — optional (items join is safe — direct FK)
+    try {
+      const res = await supabase.from('proposals').select('*, items:proposal_items(*)').eq('company_id', companyId).order('created_at', { ascending: false })
+      if (!res.error) proposalsData = res.data ?? []
+    } catch { /* proposals optional */ }
+
+    // Tasks query — optional
+    try {
+      const res = await supabase.from('tasks').select('*').eq('company_id', companyId).order('created_at', { ascending: false })
+      if (!res.error) tasksData = res.data ?? []
+    } catch { /* tasks optional */ }
+
+    setCompany(companyData)
+    setContacts(contactsData)
+    setActivities(activitiesData)
+    setProposals(proposalsData)
+    setTasks(tasksData)
+    setError(loadError)
     setLoading(false)
   }, [companyId])
 

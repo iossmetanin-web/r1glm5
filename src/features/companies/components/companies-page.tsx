@@ -218,31 +218,33 @@ export function CompaniesPage() {
   useEffect(() => {
     let cancelled = false
     async function load() {
+      let companiesData: CompanyWithManager[] = []
+      let managersData: User[] = []
+      let loadError: string | null = null
+
+      // Companies query — critical
       try {
-        const [companiesRes, managersRes] = await Promise.all([
-          supabase
-            .from('companies')
-            .select('*, manager:users!manager_id(id, name, email)')
-            .order('created_at', { ascending: false }),
-          supabase.from('users').select('*').order('name'),
-        ])
-
-        if (cancelled) return
-
-        if (companiesRes.error) throw companiesRes.error
-        if (managersRes.error) throw managersRes.error
-
-        setCompanies((companiesRes.data as CompanyWithManager[]) ?? [])
-        setManagers(managersRes.data ?? [])
-        setError(null)
+        const res = await supabase
+          .from('companies')
+          .select('*')
+          .order('created_at', { ascending: false })
+        if (res.error) throw res.error
+        companiesData = (res.data as CompanyWithManager[]) ?? []
       } catch (err: unknown) {
-        if (cancelled) return
-        const message =
-          err instanceof Error ? err.message : 'Не удалось загрузить компании'
-        setError(message)
-      } finally {
-        if (!cancelled) setLoading(false)
+        loadError = err instanceof Error ? err.message : 'Не удалось загрузить компании'
       }
+
+      // Managers query — optional (used only in create/edit dialog)
+      try {
+        const res = await supabase.from('users').select('*').order('name')
+        if (!res.error) managersData = res.data ?? []
+      } catch { /* managers optional */ }
+
+      if (cancelled) return
+      setCompanies(companiesData)
+      setManagers(managersData)
+      setError(loadError)
+      setLoading(false)
     }
     load()
     return () => {

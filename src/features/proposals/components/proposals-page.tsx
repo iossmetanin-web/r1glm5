@@ -168,7 +168,7 @@ export function ProposalsPage() {
   // ─── State ───────────────────────────────────────────────────────────────
 
   const [proposals, setProposals] = useState<ProposalWithRelations[]>([])
-  const [companies, setCompanies] = useState<Pick<Company, 'id' | 'name'>[]>([])
+  const [companies, setCompanies] = useState<Pick<Company, 'id' | 'name' | 'inn' | 'city'>[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('Все')
@@ -194,33 +194,33 @@ export function ProposalsPage() {
   useEffect(() => {
     let cancelled = false
     async function load() {
+      let proposalsData: ProposalWithRelations[] = []
+      let companiesData: Pick<Company, 'id' | 'name' | 'inn' | 'city'>[] = []
+      let loadError: string | null = null
+
+      // Proposals query — critical
       try {
-        const [proposalsRes, companiesRes] = await Promise.all([
-          supabase
-            .from('proposals')
-            .select(
-              '*, company:companies!company_id(id, name, inn, city), manager:users!manager_id(id, name)',
-            )
-            .order('created_at', { ascending: false }),
-          supabase.from('companies').select('id, name').order('name'),
-        ])
-
-        if (cancelled) return
-
-        if (proposalsRes.error) throw proposalsRes.error
-        if (companiesRes.error) throw companiesRes.error
-
-        setProposals((proposalsRes.data as ProposalWithRelations[]) ?? [])
-        setCompanies(companiesRes.data ?? [])
-        setError(null)
+        const res = await supabase
+          .from('proposals')
+          .select('*')
+          .order('created_at', { ascending: false })
+        if (res.error) throw res.error
+        proposalsData = (res.data as ProposalWithRelations[]) ?? []
       } catch (err: unknown) {
-        if (cancelled) return
-        const message =
-          err instanceof Error ? err.message : 'Не удалось загрузить предложения'
-        setError(message)
-      } finally {
-        if (!cancelled) setLoading(false)
+        loadError = err instanceof Error ? err.message : 'Не удалось загрузить предложения'
       }
+
+      // Companies lookup — optional (used for displaying company names)
+      try {
+        const res = await supabase.from('companies').select('id, name, inn, city').order('name')
+        if (!res.error) companiesData = res.data ?? []
+      } catch { /* companies lookup optional */ }
+
+      if (cancelled) return
+      setProposals(proposalsData)
+      setCompanies(companiesData)
+      setError(loadError)
+      setLoading(false)
     }
     load()
     return () => {
@@ -290,6 +290,15 @@ export function ProposalsPage() {
     [filteredProposals],
   )
 
+  // Lookup map for company names (since we no longer join)
+  const companyMap = useMemo(() => {
+    const map = new Map<string, Pick<Company, 'id' | 'name' | 'inn' | 'city'>>()
+    for (const c of companies) {
+      if (c.id) map.set(c.id, c)
+    }
+    return map
+  }, [companies])
+
   // ─── Status change ──────────────────────────────────────────────────────
 
   const handleStatusChange = async (proposal: ProposalWithRelations, newStatus: string) => {
@@ -330,7 +339,7 @@ export function ProposalsPage() {
         company_id: proposal.company_id,
         user_id: currentUser?.id,
         type: 'статус_изменен',
-        content: `Удалено ${label} для «${proposal.company?.name || '—'}»`,
+        content: `Удалено ${label} для «${companyMap.get(proposal.company_id)?.name || '—'}»`,
       })
       if (expandedId === proposal.id) setExpandedId(null)
       refresh()
@@ -735,7 +744,7 @@ export function ProposalsPage() {
                               }}
                               className="text-sm font-medium text-foreground hover:text-primary hover:underline transition-colors text-left"
                             >
-                              {proposal.company?.name || '—'}
+                              {companyMap.get(proposal.company_id)?.name || '—'}
                             </button>
                           </TableCell>
                           <TableCell>
@@ -847,16 +856,16 @@ export function ProposalsPage() {
                                       onClick={() => openCompany(proposal.company_id)}
                                       className="font-medium hover:text-primary hover:underline transition-colors"
                                     >
-                                      {proposal.company?.name || '—'}
+                                      {companyMap.get(proposal.company_id)?.name || '—'}
                                     </button>
-                                    {proposal.company?.inn && (
+                                    {companyMap.get(proposal.company_id)?.inn && (
                                       <span className="text-muted-foreground">
-                                        &middot; ИНН {proposal.company.inn}
+                                        &middot; ИНН {companyMap.get(proposal.company_id)!.inn}
                                       </span>
                                     )}
-                                    {proposal.company?.city && (
+                                    {companyMap.get(proposal.company_id)?.city && (
                                       <span className="text-muted-foreground">
-                                        &middot; {proposal.company.city}
+                                        &middot; {companyMap.get(proposal.company_id)!.city}
                                       </span>
                                     )}
                                   </div>
@@ -995,7 +1004,7 @@ export function ProposalsPage() {
                           }}
                           className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors text-left mt-1 block truncate max-w-[260px]"
                         >
-                          {proposal.company?.name || '—'}
+                          {companyMap.get(proposal.company_id)?.name || '—'}
                         </button>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -1060,13 +1069,13 @@ export function ProposalsPage() {
                           onClick={() => openCompany(proposal.company_id)}
                           className="font-medium hover:text-primary hover:underline transition-colors"
                         >
-                          {proposal.company?.name || '—'}
+                          {companyMap.get(proposal.company_id)?.name || '—'}
                         </button>
-                        {proposal.company?.inn && (
-                          <span className="text-muted-foreground">ИНН {proposal.company.inn}</span>
+                        {companyMap.get(proposal.company_id)?.inn && (
+                          <span className="text-muted-foreground">ИНН {companyMap.get(proposal.company_id)!.inn}</span>
                         )}
-                        {proposal.company?.city && (
-                          <span className="text-muted-foreground">&middot; {proposal.company.city}</span>
+                        {companyMap.get(proposal.company_id)?.city && (
+                          <span className="text-muted-foreground">&middot; {companyMap.get(proposal.company_id)!.city}</span>
                         )}
                       </div>
 
