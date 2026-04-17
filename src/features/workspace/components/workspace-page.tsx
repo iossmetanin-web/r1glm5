@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import type {
   Company,
@@ -63,6 +63,9 @@ import {
   StickyNote,
   X,
   Loader2,
+  Upload,
+  Download,
+  Image as ImageIcon,
 } from 'lucide-react'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -89,6 +92,13 @@ function relativeTime(dateStr: string): string {
   const diffD = Math.floor(diffH / 24)
   if (diffD < 7) return `${diffD} дн. назад`
   return formatDate(dateStr)
+}
+
+function formatFileSize(bytes: number): string {
+  if (!bytes) return '—'
+  if (bytes < 1024) return bytes + ' Б'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' МБ'
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -171,6 +181,11 @@ export function WorkspacePage() {
   const [commentText, setCommentText] = useState('')
   const [savingComment, setSavingComment] = useState(false)
 
+  // File upload
+  const [files, setFiles] = useState<{name: string; id: string; created_at: string; metadata: Record<string, unknown>}[]>([])
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // Fetch trigger
   const [fetchTrigger, setFetchTrigger] = useState(0)
   const refresh = () => setFetchTrigger((n) => n + 1)
@@ -213,6 +228,7 @@ export function WorkspacePage() {
       setProposals([])
       setActivities([])
       setComments([])
+      setFiles([])
       return
     }
 
@@ -252,6 +268,10 @@ export function WorkspacePage() {
 
       setActivities(results[4].status === 'fulfilled' ? (results[4].value?.data ?? []) : [])
       setComments(results[5].status === 'fulfilled' ? (results[5].value?.data ?? []) : [])
+
+      // Load files
+      const filesResult = await supabase.storage.from('crm-files').list(selectedId, { sortBy: { column: 'created_at', order: 'desc' } })
+      if (!cancelled) setFiles(filesResult.data ?? [])
     }
     loadDetails()
     return () => { cancelled = true }
@@ -367,6 +387,38 @@ export function WorkspacePage() {
       toast.success(`Статус КП изменён на «${newStatus}»`)
       refresh()
     }
+  }
+
+  // ─── File Handlers ───────────────────────────────────────────────────────
+
+  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !selectedId) return
+    setUploadingFile(true)
+    const { error } = await supabase.storage.from('crm-files').upload(`${selectedId}/${file.name}`, file)
+    if (error) {
+      toast.error('Ошибка загрузки: ' + error.message)
+    } else {
+      toast.success('Файл загружен')
+      const { data } = await supabase.storage.from('crm-files').list(selectedId)
+      if (data) setFiles(data)
+    }
+    setUploadingFile(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleDeleteFile = async (fileName: string) => {
+    if (!selectedId || !window.confirm(`Удалить файл "${fileName}"?`)) return
+    const { error } = await supabase.storage.from('crm-files').remove([`${selectedId}/${fileName}`])
+    if (!error) {
+      toast.success('Файл удалён')
+      const { data } = await supabase.storage.from('crm-files').list(selectedId)
+      if (data) setFiles(data)
+    }
+  }
+
+  const getFileUrl = (fileName: string) => {
+    return supabase.storage.from('crm-files').getPublicUrl(`${selectedId}/${fileName}`).data.publicUrl
   }
 
   // ─── Render ─────────────────────────────────────────────────────────────────
@@ -523,6 +575,9 @@ export function WorkspacePage() {
                   </TabsTrigger>
                   <TabsTrigger value="comments" className="rounded-lg text-xs gap-1.5">
                     Комментарии
+                  </TabsTrigger>
+                  <TabsTrigger value="files" className="rounded-lg text-xs gap-1.5">
+                    Файлы
                   </TabsTrigger>
                 </TabsList>
 
@@ -718,6 +773,47 @@ export function WorkspacePage() {
                         ))}
                       </div>
                     )}
+                  </TabsContent>
+
+                  {/* TAB: Files */}
+                  <TabsContent value="files" className="mt-0">
+                    <div className="space-y-3">
+                      <input ref={fileInputRef} type="file" className="hidden" onChange={handleUploadFile} />
+                      <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploadingFile} className="gap-1.5 rounded-xl w-full">
+                        {uploadingFile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                        {uploadingFile ? 'Загрузка...' : 'Загрузить файл'}
+                      </Button>
+
+                      {files.length === 0 ? (
+                        <Card className="rounded-xl border border-border/60 shadow-sm p-6">
+                          <p className="text-sm text-muted-foreground text-center">Нет файлов</p>
+                        </Card>
+                      ) : (
+                        files.map((f) => {
+                          const ext = f.name.split('.').pop()?.toLowerCase()
+                          const isImage = ['jpg','jpeg','png','gif','webp','svg'].includes(ext || '')
+                          return (
+                            <div key={f.id} className="flex items-center gap-3 p-3 rounded-xl border border-border/60 hover:bg-muted/30 transition-colors">
+                              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                {isImage ? <ImageIcon className="h-4 w-4 text-primary" /> : <FileText className="h-4 w-4 text-primary" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium truncate">{f.name}</p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {formatFileSize(f.metadata?.size as number || 0)} · {new Date(f.created_at).toLocaleDateString('ru-RU')}
+                                </p>
+                              </div>
+                              <a href={getFileUrl(f.name)} target="_blank" rel="noopener noreferrer" className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                                <Download className="h-4 w-4" />
+                              </a>
+                              <button onClick={() => handleDeleteFile(f.name)} className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
                   </TabsContent>
 
                   {/* TAB: Comments */}

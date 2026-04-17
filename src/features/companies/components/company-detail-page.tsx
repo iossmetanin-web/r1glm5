@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import type {
   Company,
@@ -68,6 +68,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { toast } from 'sonner'
 import {
   ArrowLeft,
   Pencil,
@@ -90,6 +91,11 @@ import {
   Building2,
   Send,
   CheckSquare,
+  Upload,
+  Loader2,
+  Image,
+  File,
+  Download,
 } from 'lucide-react'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -185,6 +191,24 @@ interface ProposalItemForm {
   price_per_unit: number
 }
 
+// ─── File helpers ────────────────────────────────────────────────────────
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' Б'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' МБ'
+}
+
+function getFileIcon(name: string) {
+  const ext = name.split('.').pop()?.toLowerCase()
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext ?? '')) return 'image'
+  if (['pdf'].includes(ext ?? '')) return 'pdf'
+  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext ?? '')) return 'office'
+  return 'file'
+}
+
+// ─── Proposal item form ──────────────────────────────────────────────────────
+
 const EMPTY_PROPOSAL_ITEM: ProposalItemForm = {
   product_name: '',
   description: '',
@@ -268,6 +292,11 @@ export function CompanyDetailPage() {
   })
   const [savingTask, setSavingTask] = useState(false)
 
+  // Files state
+  const [files, setFiles] = useState<{ name: string; id: string; created_at: string; metadata: Record<string, unknown> }[]>([])
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // ─── Data Fetching ────────────────────────────────────────────────────────
 
   const [fetchTrigger, setFetchTrigger] = useState(0)
@@ -315,11 +344,19 @@ export function CompanyDetailPage() {
       if (!res.error) tasksData = res.data ?? []
     } catch { /* tasks optional */ }
 
+    // Files query — optional (Supabase Storage)
+    let filesData: typeof files = []
+    try {
+      const { data: storageFiles } = await supabase.storage.from('crm-files').list(companyId, { sortBy: { column: 'created_at', order: 'desc' } })
+      if (storageFiles) filesData = storageFiles as typeof files
+    } catch { /* files optional */ }
+
     setCompany(companyData)
     setContacts(contactsData)
     setActivities(activitiesData)
     setProposals(proposalsData)
     setTasks(tasksData)
+    setFiles(filesData)
     setError(loadError)
     setLoading(false)
   }, [companyId])
@@ -650,6 +687,48 @@ export function CompanyDetailPage() {
     refresh()
   }
 
+  // ─── File Upload / Delete ─────────────────────────────────────────────────
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !companyId) return
+    setUploading(true)
+    try {
+      const { error: uploadError } = await supabase.storage.from('crm-files').upload(`${companyId}/${file.name}`, file)
+      if (uploadError) {
+        toast.error('Ошибка загрузки: ' + uploadError.message)
+      } else {
+        toast.success('Файл загружен')
+        refresh()
+      }
+    } catch (err: unknown) {
+      toast.error('Ошибка загрузки: ' + (err instanceof Error ? err.message : 'Неизвестная ошибка'))
+    }
+    setUploading(false)
+    // Reset input so the same file can be uploaded again
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleFileDelete = async (fileName: string) => {
+    if (!companyId) return
+    if (!window.confirm(`Удалить файл «${fileName}»?`)) return
+    try {
+      const { error: deleteError } = await supabase.storage.from('crm-files').remove([`${companyId}/${fileName}`])
+      if (deleteError) {
+        toast.error('Ошибка удаления: ' + deleteError.message)
+      } else {
+        toast.success('Файл удалён')
+        refresh()
+      }
+    } catch { /* silent */ }
+  }
+
+  const handleFileDownload = (fileName: string) => {
+    if (!companyId) return
+    const { data } = supabase.storage.from('crm-files').getPublicUrl(`${companyId}/${fileName}`)
+    window.open(data.publicUrl, '_blank')
+  }
+
   // ─── Loading State ────────────────────────────────────────────────────────
 
   if (loading) {
@@ -863,6 +942,13 @@ export function CompanyDetailPage() {
               <Badge variant="secondary" className="text-[10px] h-4 min-w-[16px] px-1 ml-0.5">{tasks.length}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="files" className="rounded-lg text-xs sm:text-sm gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Upload className="h-3.5 w-3.5" />
+            Файлы
+            {files.length > 0 && (
+              <Badge variant="secondary" className="text-[10px] h-4 min-w-[16px] px-1 ml-0.5">{files.length}</Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* ═══════════════════════════════════════════════════════════════════════
@@ -1074,6 +1160,7 @@ export function CompanyDetailPage() {
 
         {/* ═══════════════════════════════════════════════════════════════════════
             TAB 3: КП (Proposals)
+        ═══════════════════════════════════════════════════════════════════════
         ═══════════════════════════════════════════════════════════════════════ */}
         <TabsContent value="proposals" className="mt-4">
           <div className="flex items-center justify-between mb-4">
@@ -1251,11 +1338,100 @@ export function CompanyDetailPage() {
             </div>
           )}
         </TabsContent>
+
+        {/* ═══════════════════════════════════════════════════════════════════════
+            TAB 5: Файлы
+        ═══════════════════════════════════════════════════════════════════════ */
+        <TabsContent value="files" className="mt-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-muted-foreground">
+              {files.length}{' '}
+              {files.length === 1 ? 'файл' : files.length < 5 ? 'файла' : 'файлов'}
+            </h3>
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <Button
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="gap-1.5 rounded-xl"
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {uploading ? 'Загрузка...' : 'Загрузить файл'}
+              </Button>
+            </div>
+          </div>
+
+          {files.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <File className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Нет загруженных файлов</p>
+              <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="gap-1.5 rounded-xl">
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                Загрузить
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {files.map((file) => {
+                const iconType = getFileIcon(file.name)
+                const FileIconComponent = iconType === 'image' ? Image : iconType === 'pdf' ? FileText : File
+                const iconColorClass = iconType === 'image'
+                  ? 'text-emerald-500'
+                  : iconType === 'pdf'
+                    ? 'text-red-500'
+                    : iconType === 'office'
+                      ? 'text-sky-500'
+                      : 'text-muted-foreground'
+                return (
+                  <Card key={file.id} className="rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-10 w-10 rounded-lg flex items-center justify-center bg-muted/60 shrink-0 ${iconColorClass}`}>
+                          <FileIconComponent className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" title={file.name}>{file.name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {file.metadata?.size && typeof file.metadata.size === 'number' && (
+                              <span className="text-xs text-muted-foreground">{formatFileSize(file.metadata.size)}</span>
+                            )}
+                            <span className="text-xs text-muted-foreground">
+                              {formatDateTime(file.created_at)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => handleFileDownload(file.name)}
+                            className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                            title="Скачать"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleFileDelete(file.name)}
+                            className="h-8 w-8 rounded-md inline-flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                            title="Удалить"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+        </TabsContent>
       </Tabs>
 
-      {/* ═══════════════════════════════════════════════════════════════════════
-          DIALOG: Edit Company
-      ═══════════════════════════════════════════════════════════════════════ */}
+      {/* DIALOG: Edit Company */}
       <Dialog open={editCompanyOpen} onOpenChange={(open) => {
         setEditCompanyOpen(open)
         if (!open) setEditForm({ name: '', inn: '', city: '', website: '', contact_phone: '', contact_email: '', source: '', status: '', notes: '', lost_reason: '' })
