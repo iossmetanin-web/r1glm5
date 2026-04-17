@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Zap,
   LogOut,
+  Briefcase,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -35,8 +36,9 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { view: 'dashboard', label: 'Панель', icon: LayoutDashboard, color: 'bg-blue-500', tint: 'bg-blue-50', text: 'text-blue-600' },
+  { view: 'workspace', label: 'Рабочая область', icon: Briefcase, color: 'bg-emerald-500', tint: 'bg-emerald-50', text: 'text-emerald-600' },
   { view: 'proposals', label: 'КП', icon: FileText, color: 'bg-amber-500', tint: 'bg-amber-50', text: 'text-amber-600' },
-  { view: 'companies', label: 'Клиенты', icon: Users, color: 'bg-emerald-500', tint: 'bg-emerald-50', text: 'text-emerald-600' },
+  { view: 'companies', label: 'Клиенты', icon: Users, color: 'bg-sky-500', tint: 'bg-sky-50', text: 'text-sky-600' },
   { view: 'tasks', label: 'Задачи', icon: CheckSquare, color: 'bg-violet-500', tint: 'bg-violet-50', text: 'text-violet-600' },
   { view: 'settings', label: 'Настройки', icon: Settings, color: 'bg-gray-500', tint: 'bg-gray-50', text: 'text-gray-600' },
 ]

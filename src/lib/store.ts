@@ -3,7 +3,7 @@ import type { User } from '@/lib/supabase/database.types'
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
-export type AppView = 'dashboard' | 'companies' | 'company-detail' | 'proposals' | 'tasks' | 'settings'
+export type AppView = 'dashboard' | 'companies' | 'company-detail' | 'proposals' | 'tasks' | 'settings' | 'workspace'
 
 interface NavigationState {
   currentView: AppView

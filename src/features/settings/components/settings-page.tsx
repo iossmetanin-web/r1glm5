@@ -118,24 +118,29 @@ const SETTINGS_IDS: Record<string, string> = {
 }
 
 async function loadSettings<T>(category: string, fallback: T): Promise<T> {
-  const { data } = await supabase
-    .from('activities')
-    .select('action')
-    .eq('id', SETTINGS_IDS[category])
-    .single()
-  if (!data) return fallback
-  try { return JSON.parse(data.action) as T }
-  catch { return fallback }
+  try {
+    const { data } = await supabase
+      .from('activities')
+      .select('content, type')
+      .eq('id', SETTINGS_IDS[category])
+      .eq('type', 'settings')
+      .single()
+    if (!data?.content) return fallback
+    try { return JSON.parse(data.content) as T }
+    catch { return fallback }
+  } catch { return fallback }
 }
 
 async function saveSettings(category: string, data: unknown): Promise<boolean> {
-  const { error } = await supabase
-    .from('activities')
-    .upsert(
-      { id: SETTINGS_IDS[category], action: JSON.stringify(data), entity_type: 'settings_v1' },
-      { onConflict: 'id' }
-    )
-  return !error
+  try {
+    const { error } = await supabase
+      .from('activities')
+      .upsert(
+        { id: SETTINGS_IDS[category], content: JSON.stringify(data), type: 'settings', user_id: null, company_id: null },
+        { onConflict: 'id' }
+      )
+    return !error
+  } catch { return false }
 }
 
 // ─── Defaults ────────────────────────────────────────────────────────────────
@@ -440,12 +445,17 @@ function UsersSection() {
     }
 
     setDialogOpen(false)
-    loadUsers()
+    // Reload users
+    supabase.from('users').select('*').order('name').then(({ data: d }) => {
+      if (d) setUsers(d)
+    })
   }
 
   const handleDelete = async (id: string) => {
     await supabase.from('users').delete().eq('id', id)
-    loadUsers()
+    supabase.from('users').select('*').order('name').then(({ data: d }) => {
+      if (d) setUsers(d)
+    })
   }
 
   return (
@@ -670,12 +680,17 @@ function CrmSection() {
     if (dbError) { setError('Ошибка сохранения: ' + dbError.message); return }
 
     setDialogOpen(false)
-    loadStages()
+    // Reload stages
+    supabase.from('pipeline_stages').select('*').eq('pipeline_id', PIPELINE_ID).order('position').then(({ data: d }) => {
+      if (d) setStages(d)
+    })
   }
 
   const handleDelete = async (id: string) => {
     await supabase.from('pipeline_stages').delete().eq('id', id)
-    loadStages()
+    supabase.from('pipeline_stages').select('*').eq('pipeline_id', PIPELINE_ID).order('position').then(({ data: d }) => {
+      if (d) setStages(d)
+    })
   }
 
   return (

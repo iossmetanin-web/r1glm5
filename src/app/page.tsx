@@ -12,6 +12,7 @@ import { CompanyDetailPage } from '@/features/companies/components/company-detai
 import { ProposalsPage } from '@/features/proposals/components/proposals-page'
 import TasksPage from '@/features/tasks/components/tasks-page'
 import { SettingsPage } from '@/features/settings/components/settings-page'
+import { WorkspacePage } from '@/features/workspace/components/workspace-page'
 import { Loader2 } from 'lucide-react'
 
 // SSR-safe mounted detection using useSyncExternalStore
@@ -60,6 +61,7 @@ function AppContent() {
     proposals: <ProposalsPage />,
     tasks: <TasksPage />,
     settings: <SettingsPage />,
+    workspace: <WorkspacePage />,
   }
 
   return (

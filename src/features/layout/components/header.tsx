@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect, useRef } from 'react'
 import {
   Search,
   Bell,
@@ -7,6 +8,12 @@ import {
   Menu,
   Settings,
   LogOut,
+  Building2,
+  FileText,
+  CheckSquare,
+  Users,
+  X,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,25 +27,34 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+} from '@/components/ui/dialog'
 import { useAuthStore, useNavigationStore, useUIStore } from '@/lib/store'
-import type { AppView } from '@/lib/store'
+import { useNavigate } from 'next/navigation'
+import { toast } from 'sonner'
+import type { LucideIcon } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
 
-const viewTitles: Record<AppView, string> = {
+const viewTitles: Record<string, string> = {
   dashboard: 'Панель',
   companies: 'Клиенты',
   'company-detail': 'Карточка клиента',
   proposals: 'Коммерческие предложения',
   tasks: 'Задачи',
   settings: 'Настройки',
+  workspace: 'Рабочая область',
 }
 
-const viewColors: Record<AppView, string> = {
+const viewColors: Record<string, string> = {
   dashboard: 'bg-blue-500',
-  companies: 'bg-emerald-500',
-  'company-detail': 'bg-emerald-500',
+  companies: 'bg-sky-500',
+  'company-detail': 'bg-sky-500',
   proposals: 'bg-amber-500',
   tasks: 'bg-violet-500',
   settings: 'bg-gray-500',
+  workspace: 'bg-emerald-500',
 }
 
 export function Header() {
@@ -47,8 +63,10 @@ export function Header() {
   const currentView = useNavigationStore((s) => s.currentView)
   const navigate = useNavigationStore((s) => s.navigate)
   const goBack = useNavigationStore((s) => s.goBack)
+  const openCompany = useNavigationStore((s) => s.openCompany)
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
+  const nextNavigate = useNavigate()
 
   const userInitials = currentUser?.name
     ? currentUser.name
@@ -58,6 +76,130 @@ export function Header() {
         .slice(0, 2)
         .toUpperCase()
     : '??'
+
+  // ── Global Search State ──────────────────────────────────────────────
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<
+    { type: 'company' | 'proposal' | 'task'; id: string; title: string; subtitle: string }[]
+  >([])
+  const [searching, setSearching] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query)
+    if (!query.trim()) { setSearchResults([]); return }
+    setSearching(true)
+    try {
+      const q = query.toLowerCase()
+      const results: typeof searchResults extends (infer U)[] ? U : never[] = []
+
+      // Search companies
+      const { data: companies } = await supabase
+        .from('companies')
+        .select('id, name, city, status, manager_name')
+        .or(`name.ilike.%${q}%,city.ilike.%${q}%,inn.ilike.%${q}%`)
+        .limit(10)
+      if (companies) {
+        for (const c of companies) {
+          results.push({ type: 'company', id: c.id, title: c.name, subtitle: c.city || c.status || '' })
+        }
+      }
+
+      // Search proposals
+      const { data: proposals } = await supabase
+        .from('proposals')
+        .select('id, number, status, total_amount, company_id')
+        .or(`number.ilike.%${q}%`)
+        .limit(10)
+      if (proposals) {
+        // Get company names for proposals
+        const companyIds = proposals.map((p: any) => p.company_id).filter(Boolean)
+        const companyMap: Record<string, string> = {}
+        if (companyIds.length > 0) {
+          const { data: cData } = await supabase.from('companies').select('id, name').in('id', companyIds)
+          if (cData) cData.forEach((c: any) => { companyMap[c.id] = c.name })
+        }
+        for (const p of proposals) {
+          results.push({
+            type: 'proposal',
+            id: p.id,
+            title: p.number ? `КП №${p.number}` : 'КП',
+            subtitle: `${companyMap[p.company_id] || '—'} · ${formatCurrency(p.total_amount || 0)}`,
+          })
+        }
+      }
+
+      // Search tasks
+      const { data: tasks } = await supabase
+        .from('tasks')
+        .select('id, title, status, priority, deadline, company_id')
+        .ilike('title', `%${q}%`)
+        .limit(10)
+      if (tasks) {
+        const companyIds = tasks.map((t: any) => t.company_id).filter(Boolean)
+        const companyMap: Record<string, string> = {}
+        if (companyIds.length > 0) {
+          const { data: cData } = await supabase.from('companies').select('id, name').in('id', companyIds)
+          if (cData) cData.forEach((c: any) => { companyMap[c.id] = c.name })
+        }
+        for (const t of tasks) {
+          results.push({
+            type: 'task',
+            id: t.id,
+            title: t.title,
+            subtitle: `${companyMap[t.company_id] || ''} · ${t.priority} · ${t.deadline || ''}`,
+          })
+        }
+      }
+
+      setSearchResults(results)
+    } catch {
+      // silent
+    }
+    setSearching(false)
+  }
+
+  const openSearch = () => {
+    setSearchOpen(true)
+    setTimeout(() => searchInputRef.current?.focus(), 100)
+  }
+
+  const closeSearch = () => {
+    setSearchOpen(false)
+    setSearchQuery('')
+    setSearchResults([])
+  }
+
+  const handleResultClick = (result: typeof searchResults extends (infer U)[] ? U : never) => {
+    closeSearch()
+    if (result.type === 'company') {
+      openCompany(result.id)
+    } else if (result.type === 'proposal') {
+      // Navigate to company then proposals tab
+      // For now just show toast
+      toast.info('Откройте клиент этого КП для просмотра')
+    } else if (result.type === 'task') {
+      // Navigate to workspace
+      if (result.company_id) {
+        openCompany(result.company_id)
+      }
+      toast.info('Перейдите в «Рабочая область» для просмотра задачи')
+    }
+  }
+
+  useEffect(() => {
+    if (!searchOpen) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeSearch()
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        openSearch()
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [searchOpen])
 
   return (
     <header
