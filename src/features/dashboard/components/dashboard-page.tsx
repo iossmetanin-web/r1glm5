@@ -37,7 +37,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Checkbox } from '@/components/ui/checkbox'
 import { supabase } from '@/lib/supabase/client'
 import type {
-  Company,
   Activity,
   Task,
   Proposal,
@@ -48,10 +47,6 @@ import type {
 
 interface ActivityWithUser extends Activity {
   user: Pick<UserType, 'id' | 'name'> | null
-}
-
-interface TaskWithCompany extends Task {
-  company: Pick<Company, 'id' | 'name'> | null
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -189,7 +184,7 @@ export function DashboardPage() {
   const [overdueCount, setOverdueCount] = useState(0)
   const [funnelAmount, setFunnelAmount] = useState(0)
   const [activeProposals, setActiveProposals] = useState(0)
-  const [todayTasks, setTodayTasks] = useState<TaskWithCompany[]>([])
+  const [todayTasks, setTodayTasks] = useState<Task[]>([])
   const [todayTasksTotal, setTodayTasksTotal] = useState(0)
   const [todayTasksDone, setTodayTasksDone] = useState(0)
   const [companiesByStatus, setCompaniesByStatus] = useState<
@@ -252,11 +247,11 @@ export function DashboardPage() {
       // ── Tasks (optional — table may not exist yet) ─────────────────────
       try {
         const [tasksRes, tasksAllRes] = await Promise.all([
-          supabase.from('tasks').select('*, company:companies!company_id(id, name)').neq('status', 'done').lte('deadline', today).order('priority', { ascending: false }),
+          supabase.from('tasks').select('*').neq('status', 'done').lte('deadline', today).order('priority', { ascending: false }),
           supabase.from('tasks').select('status').lte('deadline', today),
         ])
         if (!tasksRes.error) {
-          const taskData = (tasksRes.data as unknown as TaskWithCompany[]) ?? []
+          const taskData = (tasksRes.data as Task[]) ?? []
           setTodayTasks(taskData)
           setTodayTasksTotal(taskData.length)
           if (!tasksAllRes.error) {
@@ -715,9 +710,9 @@ export function DashboardPage() {
                             <Badge variant={priorityVariant} className="text-[10px] px-1.5 py-0">
                               {priorityLabel}
                             </Badge>
-                            {task.company && (
+                            {task.company_id && (
                               <span className="text-xs text-muted-foreground">
-                                {task.company.name}
+                                ID: {task.company_id.slice(0, 8)}
                               </span>
                             )}
                             {isOverdue && (

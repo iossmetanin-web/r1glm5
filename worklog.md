@@ -397,3 +397,45 @@ Stage Summary:
 - Company detail: company query critical, contacts/activities/proposals/tasks all optional
 - Display gracefully degrades when joins removed (manager_name fallback, optional chaining)
 - Lint passes cleanly
+
+---
+Task ID: 2
+Agent: subagent
+Task: Fix tasks page data loading — remove fragile Supabase JOINs
+
+Work Log:
+- Read worklog.md for context (tasks 1–3b, previous join fixes on companies/proposals/company-detail pages)
+- Read tasks-page.tsx (1025 lines) and dashboard-page.tsx (753 lines) completely
+
+### File 1: tasks-page.tsx
+**Bug**: Line 199 uses fragile Supabase query with two JOINs:
+```
+.select('*, company:companies(id, name), created_by_user:users!created_by(id, name)')
+```
+If either `companies` or `users` table join fails (RLS, missing FK, etc.), the entire query errors and no tasks load.
+Additionally, `Promise.all([fetchTasks(), fetchCompanies()])` couples the critical tasks fetch to the optional companies fetch.
+
+**Fixes applied**:
+1. **fetchTasks (line 199)**: Removed both JOINs → now uses `select('*')` only. Tasks query is self-contained and resilient.
+2. **useEffect load (line 230)**: Replaced `Promise.all([fetchTasks(), fetchCompanies()])` with independent calls — `fetchCompanies()` runs fire-and-forget with `.catch(() => {})`, only `fetchTasks()` is awaited.
+3. **Added companyMap useMemo (line 243)**: Builds `Map<string, {id, name}>` from `companies` state for O(1) company name lookups.
+4. **Company Badge (line 746-755)**: Changed from `task.company && ...task.company.name...task.company!.id` to `task.company_id && companyMap.get(task.company_id) && ...companyMap.get(task.company_id!)!.name`.
+5. **Created by user (line 787-791)**: Removed the `task.created_by_user` display block entirely — the join no longer exists, so gracefully skip showing creator info. Added comment explaining why.
+
+### File 2: dashboard-page.tsx
+**Bug**: Line 255 uses fragile join `select('*, company:companies!company_id(id, name)')` in the dashboard tasks query.
+**Fixes applied**:
+1. **Tasks query (line 255)**: Removed `company:companies!company_id(id, name)` join → now uses `select('*')` only.
+2. **todayTasks state type**: Changed from `TaskWithCompany[]` to `Task[]`.
+3. **Removed TaskWithCompany interface**: No longer needed without the join.
+4. **Company display in task cards (line 718-722)**: Changed from `task.company && task.company.name` to showing `task.company_id` as truncated ID text — dashboard is secondary, company names not critical here.
+5. **Cleaned up unused import**: Removed `Company` from type imports (no longer referenced).
+
+- Ran lint: 0 errors
+
+Stage Summary:
+- 2 files modified, all fragile Supabase JOINs removed from tasks queries
+- Tasks page: tasks query critical + independent, companies lookup optional, companyMap for display, created_by_user gracefully removed
+- Dashboard: tasks query uses select('*'), company names replaced with truncated ID in dashboard task list (secondary view)
+- Consistent pattern with previous fixes (task 3-b) across companies/proposals/company-detail pages
+- No backend changes, minimal edits, lint passes cleanly

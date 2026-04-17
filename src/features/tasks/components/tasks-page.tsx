@@ -194,15 +194,17 @@ export default function TasksPage() {
 
   const fetchTasks = useCallback(async () => {
     try {
+      // Tasks - critical (no fragile JOINs on users table)
       const { data, error: fetchError } = await supabase
         .from('tasks')
-        .select('*, company:companies(id, name), created_by_user:users!created_by(id, name)')
+        .select('*')
         .order('created_at', { ascending: false })
 
       if (fetchError) {
         setError(fetchError.message)
       } else {
-        setTasks((data ?? []) as TaskWithRelations[])
+        const taskData = (data ?? []) as TaskWithRelations[]
+        setTasks(taskData)
         setError(null)
       }
     } catch (err: unknown) {
@@ -227,12 +229,24 @@ export default function TasksPage() {
     let cancelled = false
 
     async function load() {
-      await Promise.all([fetchTasks(), fetchCompanies()])
+      // Companies fetch is non-critical — run independently
+      fetchCompanies().catch(() => {})
+      await fetchTasks()
       if (!cancelled) setLoading(false)
     }
     load()
     return () => { cancelled = true }
   }, [fetchTrigger, fetchTasks, fetchCompanies])
+
+  // ─── Company Lookup Map ────────────────────────────────────────────────
+
+  const companyMap = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>()
+    for (const c of companies) {
+      map.set(c.id, { id: c.id, name: c.name })
+    }
+    return map
+  }, [companies])
 
   const refresh = () => {
     setLoading(true)
@@ -743,14 +757,14 @@ export default function TasksPage() {
                           )}
 
                           {/* Company Badge */}
-                          {task.company && (
+                          {task.company_id && companyMap.get(task.company_id) && (
                             <Badge
                               variant="outline"
                               className="text-[10px] font-medium gap-1 cursor-pointer hover:bg-primary/10 transition-colors"
-                              onClick={() => openCompany(task.company!.id)}
+                              onClick={() => openCompany(task.company_id!)}
                             >
                               <Building2 className="h-3 w-3" />
-                              {task.company.name}
+                              {companyMap.get(task.company_id!)!.name}
                             </Badge>
                           )}
 
@@ -783,12 +797,8 @@ export default function TasksPage() {
                           </span>
                         </div>
 
-                        {/* Created by (if shared and not current user) */}
-                        {task.is_shared && task.created_by_user && task.created_by_user.id !== currentUser?.id && (
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            Создана: {task.created_by_user.name}
-                          </p>
-                        )}
+                        {/* Created by (if shared and not current user) — requires user lookup */}
+                        {/* Removed: created_by_user join was fragile; display skipped gracefully */}
                       </div>
                     </div>
                   </CardContent>
