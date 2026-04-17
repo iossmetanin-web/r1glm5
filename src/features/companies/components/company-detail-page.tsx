@@ -1341,7 +1341,7 @@ export function CompanyDetailPage() {
 
         {/* ═══════════════════════════════════════════════════════════════════════
             TAB 5: Файлы
-        ═══════════════════════════════════════════════════════════════════════ */
+        ═══════════════════════════════════════════════════════════════════════ */}
         <TabsContent value="files" className="mt-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium text-muted-foreground">
@@ -1428,6 +1428,7 @@ export function CompanyDetailPage() {
                 )
               })}
             </div>
+          )}
         </TabsContent>
       </Tabs>
 
