@@ -39,7 +39,6 @@ import { supabase } from '@/lib/supabase/client'
 import type {
   Activity,
   Task,
-  Proposal,
   User as UserType,
 } from '@/lib/supabase/database.types'
 
@@ -50,20 +49,6 @@ interface ActivityWithUser extends Activity {
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
-
-const STATUS_COLORS: Record<string, string> = {
-  'слабый интерес': '#94a3b8',
-  'надо залечивать': '#f59e0b',
-  'сделал запрос': '#0ea5e9',
-  'сделал заказ': '#22c55e',
-}
-
-const STATUS_ORDER = [
-  'слабый интерес',
-  'надо залечивать',
-  'сделал запрос',
-  'сделал заказ',
-]
 
 const SOURCE_COLORS: Record<string, string> = {
   'входящая заявка': '#0ea5e9',
@@ -188,11 +173,11 @@ export function DashboardPage() {
   const [todayTasksTotal, setTodayTasksTotal] = useState(0)
   const [todayTasksDone, setTodayTasksDone] = useState(0)
   const [companyMapForTasks, setCompanyMapForTasks] = useState<Map<string, string>>(new Map())
-  const [companiesByStatus, setCompaniesByStatus] = useState<
-    { name: string; count: number; fill: string }[]
-  >([])
   const [companiesBySource, setCompaniesBySource] = useState<
     { name: string; value: number; fill: string }[]
+  >([])
+  const [dealsByStage, setDealsByStage] = useState<
+    { name: string; count: number; fill: string }[]
   >([])
   const [activities, setActivities] = useState<ActivityWithUser[]>([])
 
@@ -206,37 +191,26 @@ export function DashboardPage() {
 
     try {
       // ── Companies (core data — must succeed) ──────────────────────────
-      const [companiesCountRes, companiesNewRes, overdueRes, proposalsRes, activeProposalsRes] =
+      const [companiesCountRes, companiesNewRes, overdueRes, dealsRes, activeDealsRes] =
         await Promise.all([
           supabase.from('companies').select('*', { count: 'exact', head: true }),
           supabase.from('companies').select('*', { count: 'exact', head: true }).gte('created_at', monthStart),
           supabase.from('companies').select('*', { count: 'exact', head: true }).not('next_contact_date', 'is', null).lt('next_contact_date', threeDaysAgo),
-          supabase.from('proposals').select('total_amount').neq('status', 'отклонено'),
-          supabase.from('proposals').select('*', { count: 'exact', head: true }).neq('status', 'отклонено'),
+          supabase.from('deals').select('value'),
+          supabase.from('deals').select('*', { count: 'exact', head: true }),
         ])
 
       if (companiesCountRes.error) throw companiesCountRes.error
-      if (proposalsRes.error) throw proposalsRes.error
 
       setTotalCompanies(companiesCountRes.count ?? 0)
       setNewThisMonth(companiesNewRes.count ?? 0)
       setOverdueCount(overdueRes.count ?? 0)
-      const proposals = proposalsRes.data ?? []
-      setFunnelAmount(proposals.reduce((sum, p) => sum + (p.total_amount ?? 0), 0))
-      setActiveProposals(activeProposalsRes.count ?? 0)
+      const deals = dealsRes.data ?? []
+      setFunnelAmount(deals.reduce((sum, d) => sum + (d.value ?? 0), 0))
+      setActiveProposals(activeDealsRes.count ?? 0)
 
       // ── Chart data ─────────────────────────────────────────────────────
-      const [companiesByStatusRes, companiesBySourceRes] = await Promise.all([
-        supabase.from('companies').select('status'),
-        supabase.from('companies').select('source'),
-      ])
-
-      const statusCounts: Record<string, number> = {}
-      for (const s of STATUS_ORDER) statusCounts[s] = 0
-      for (const c of companiesByStatusRes.data ?? []) {
-        if (c.status && statusCounts[c.status] !== undefined) statusCounts[c.status]++
-      }
-      setCompaniesByStatus(STATUS_ORDER.map((s) => ({ name: s, count: statusCounts[s], fill: STATUS_COLORS[s] })))
+      const companiesBySourceRes = await supabase.from('companies').select('source')
 
       const sourceCounts: Record<string, number> = {}
       for (const s of Object.keys(SOURCE_COLORS)) sourceCounts[s] = 0
@@ -244,6 +218,29 @@ export function DashboardPage() {
         if (c.source && sourceCounts[c.source] !== undefined) sourceCounts[c.source]++
       }
       setCompaniesBySource(Object.keys(SOURCE_COLORS).map((s) => ({ name: s, value: sourceCounts[s], fill: SOURCE_COLORS[s] })).filter((d) => d.value > 0))
+
+      // ── Deals by stage (pipeline funnel) ──────────────────────────────
+      try {
+        const [stagesRes, dealsCountRes] = await Promise.all([
+          supabase.from('pipeline_stages').select('*').order('position'),
+          supabase.from('deals').select('stage_id'),
+        ])
+        if (!stagesRes.error && stagesRes.data) {
+          const stageMap = new Map<string, { name: string; color: string }>()
+          for (const s of stagesRes.data) stageMap.set(s.id, { name: s.name, color: s.color })
+          const stageCounts: Record<string, number> = {}
+          if (!dealsCountRes.error && dealsCountRes.data) {
+            for (const d of dealsCountRes.data) {
+              if (d.stage_id) stageCounts[d.stage_id] = (stageCounts[d.stage_id] ?? 0) + 1
+            }
+          }
+          setDealsByStage(stagesRes.data.map((s) => ({
+            name: s.name,
+            count: stageCounts[s.id] ?? 0,
+            fill: s.color,
+          })))
+        }
+      } catch { /* optional data */ }
 
       // ── Tasks (optional — separate queries, no JOINs) ───────────────
       try {
@@ -379,7 +376,7 @@ export function DashboardPage() {
     {
       title: 'Воронка',
       value: formatCurrency(funnelAmount),
-      subtitle: `${activeProposals} активных КП`,
+      subtitle: `${activeProposals} активных сделок`,
       icon: TrendingUp,
       iconBg: 'bg-emerald-500/10',
       iconColor: 'text-emerald-600 dark:text-emerald-400',
@@ -530,16 +527,17 @@ export function DashboardPage() {
 
       {/* ── Row 2: Charts ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Horizontal Bar Chart — Воронка продаж */}
+        {/* Horizontal Bar Chart — Сделки по этапам */}
         <Card className="shadow-sm transition-shadow duration-200 hover:shadow-md">
           <CardHeader>
-            <CardTitle className="text-base">Воронка продаж</CardTitle>
+            <CardTitle className="text-base">Сделки по этапам</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
+              {dealsByStage.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={companiesByStatus}
+                  data={dealsByStage}
                   layout="vertical"
                   barCategoryGap="25%"
                   margin={{ top: 0, right: 20, bottom: 0, left: 0 }}
@@ -566,12 +564,17 @@ export function DashboardPage() {
                   />
                   <Tooltip content={<CustomBarTooltip />} cursor={false} />
                   <Bar dataKey="count" radius={[0, 6, 6, 0]} maxBarSize={36}>
-                    {companiesByStatus.map((entry, index) => (
+                    {dealsByStage.map((entry, index) => (
                       <Cell key={index} fill={entry.fill} />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  Нет сделок в воронке
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -72,3 +72,25 @@ Stage Summary:
 - Deals tab uses separate queries (no JOINs) — pipeline_stages + deals fetched in parallel, stage found via in-memory find
 - Move/delete deal operations log activities and show toast notifications
 - КП tab renamed to value="proposals" to free up value="deals" for the new Сделки tab
+
+---
+Task ID: 3
+Agent: Main
+Task: Final Integration — Dashboard, Company Detail, Settings, Segments, Cleanup
+
+Work Log:
+- **settings-page.tsx**: Fixed missing `Switch` import — added `import { Switch } from '@/components/ui/switch'`. Pipeline stage deal counts were already implemented (from previous session) — verified working.
+- **dashboard-page.tsx**: Changed funnel metric from `proposals.total_amount` to `deals.value` — now shows real pipeline value. Replaced "Воронка продаж" bar chart (companies by status) with "Сделки по этапам" (deals by pipeline stage with real stage colors). Subtitle changed from "N активных КП" to "N активных сделок". Removed unused `Proposal` type import and dead `STATUS_COLORS`/`STATUS_ORDER` constants.
+- **company-detail-page.tsx**: Added "Сделки" (Deals) tab as TAB 4 between КП and Задачи. Added `Deal`/`PipelineStage` type imports, `Briefcase`/`ChevronLeft`/`ChevronRight` icon imports. Added state: `companyDeals` and `pipelineStages`. Added deals+stages fetch in `fetchData`. Added `moveDeal` (stage navigation with activity log + toast) and `deleteDeal` (with activity log + toast) functions. Tab shows deal cards with value, stage badge, priority badge, stage navigation bar, and delete button. Company detail now has 6 tabs: Контакты ЛПР, История, КП, Сделки, Задачи, Файлы.
+- **companies-page.tsx**: Added segment filtering. Added `SegmentItem` interface, segment helper functions (`loadSegments`, `getCompanySegments`), `allSegments`/`companySegments` state, `segmentFilter` state. Fetched segments alongside tags in a single `in('type', ['company_tag', 'company_segment'])` query. Added segment filter dropdown with `Layers` icon. Updated filter logic and "found" counter. Updated `useMemo` dependencies.
+- **Dead code removed**: Deleted unreachable `contacts-page.tsx` (used legacy `clients` table, never imported in router).
+- **settings-page.tsx**: Persisted reminder toggle state to DB via `saveSettings('reminder', checked)`. Added `reminder` to SETTINGS_IDS, `reminderInitialized` guard, and `handleReminderToggle` function.
+- All changes pass ESLint clean (0 errors, 0 warnings).
+
+Stage Summary:
+- Dashboard shows real pipeline value from deals table, with deals-by-stage chart
+- Company Detail page has deals tab with full move/delete functionality
+- Companies page supports segment filtering (segments loaded from settings)
+- Reminder toggle state persisted to database
+- Dead contacts page removed
+- Full CRM flow now works: Client → Company Detail → Deals tab → Move deal through stages → Create tasks → Close deal

@@ -14,6 +14,8 @@ import type {
   ProposalItemInsert,
   Task,
   TaskInsert,
+  Deal,
+  PipelineStage,
   COMPANY_SOURCES,
   COMPANY_STATUSES,
   ACTIVITY_TYPES,
@@ -91,6 +93,9 @@ import {
   Building2,
   Send,
   CheckSquare,
+  Briefcase,
+  ChevronLeft,
+  ChevronRight,
   Upload,
   Loader2,
   Image,
@@ -230,6 +235,8 @@ export function CompanyDetailPage() {
   const [activities, setActivities] = useState<(Activity & { user?: { id: string; name: string } | null; contact?: { id: string; name: string; position: string | null } | null })[]>([])
   const [proposals, setProposals] = useState<(Proposal & { items?: ProposalItem[] })[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
+  const [companyDeals, setCompanyDeals] = useState<Deal[]>([])
+  const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('contacts')
@@ -344,6 +351,18 @@ export function CompanyDetailPage() {
       if (!res.error) tasksData = res.data ?? []
     } catch { /* tasks optional */ }
 
+    // Deals + pipeline stages — optional
+    let dealsData: Deal[] = []
+    let stagesData: PipelineStage[] = []
+    try {
+      const [dealsRes, stagesRes] = await Promise.all([
+        supabase.from('deals').select('*').eq('client_id', companyId).order('created_at', { ascending: false }),
+        supabase.from('pipeline_stages').select('*').order('position'),
+      ])
+      if (!dealsRes.error) dealsData = dealsRes.data ?? []
+      if (!stagesRes.error) stagesData = stagesRes.data ?? []
+    } catch { /* deals optional */ }
+
     // Files query — optional (Supabase Storage)
     let filesData: typeof files = []
     try {
@@ -356,6 +375,8 @@ export function CompanyDetailPage() {
     setActivities(activitiesData)
     setProposals(proposalsData)
     setTasks(tasksData)
+    setCompanyDeals(dealsData)
+    setPipelineStages(stagesData)
     setFiles(filesData)
     setError(loadError)
     setLoading(false)
@@ -687,6 +708,38 @@ export function CompanyDetailPage() {
     refresh()
   }
 
+  // ─── Deal Move / Delete ─────────────────────────────────────────────────
+
+  const moveDeal = async (deal: Deal, newIndex: number) => {
+    if (newIndex < 0 || newIndex >= pipelineStages.length) return
+    const newStage = pipelineStages[newIndex]
+    if (!newStage || deal.stage_id === newStage.id) return
+    const { error } = await supabase.from('deals').update({ stage_id: newStage.id }).eq('id', deal.id)
+    if (error) { toast.error('Ошибка: ' + error.message); return }
+    toast.success(`Сделка «${deal.title}» → «${newStage.name}»`)
+    await supabase.from('activities').insert({
+      content: `Перемещена сделка «${deal.title}» в ${newStage.name}`,
+      type: 'заметка',
+      user_id: currentUser?.id ?? null,
+      company_id: companyId ?? undefined,
+    } as any)
+    refresh()
+  }
+
+  const deleteDeal = async (deal: Deal) => {
+    if (!window.confirm(`Удалить сделку «${deal.title}»?`)) return
+    const { error } = await supabase.from('deals').delete().eq('id', deal.id)
+    if (error) { toast.error('Ошибка: ' + error.message); return }
+    toast.success(`Сделка «${deal.title}» удалена`)
+    await supabase.from('activities').insert({
+      content: `Удалена сделка «${deal.title}»`,
+      type: 'заметка',
+      user_id: currentUser?.id ?? null,
+      company_id: companyId ?? undefined,
+    } as any)
+    refresh()
+  }
+
   // ─── File Upload / Delete ─────────────────────────────────────────────────
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -934,6 +987,13 @@ export function CompanyDetailPage() {
             КП
             {proposals.length > 0 && (
               <Badge variant="secondary" className="text-[10px] h-4 min-w-[16px] px-1 ml-0.5">{proposals.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="deals" className="rounded-lg text-xs sm:text-sm gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Briefcase className="h-3.5 w-3.5" />
+            Сделки
+            {companyDeals.length > 0 && (
+              <Badge variant="secondary" className="text-[10px] h-4 min-w-[16px] px-1 ml-0.5">{companyDeals.length}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="tasks" className="rounded-lg text-xs sm:text-sm gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
@@ -1265,7 +1325,95 @@ export function CompanyDetailPage() {
         </TabsContent>
 
         {/* ═══════════════════════════════════════════════════════════════════════
-            TAB 4: Задачи
+            TAB 4: Сделки
+        ═══════════════════════════════════════════════════════════════════════ */}
+        <TabsContent value="deals" className="mt-4">
+          {companyDeals.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Briefcase className="h-10 w-10 mb-3 opacity-40" />
+              <p className="text-sm">Нет сделок у этого клиента</p>
+              <p className="text-xs mt-1 opacity-60">Сделки можно создать на странице «Сделки»</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {companyDeals.map((deal) => {
+                const stage = pipelineStages.find((s) => s.id === deal.stage_id)
+                const stageIndex = pipelineStages.findIndex((s) => s.id === deal.stage_id)
+                return (
+                  <Card key={deal.id} className="rounded-xl border border-border/60 shadow-sm">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">{deal.title}</p>
+                          <p className="text-base font-semibold text-foreground mt-1">
+                            {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 }).format(deal.value ?? 0)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {stage && (
+                            <Badge className="text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: stage.color + '20', color: stage.color, borderColor: stage.color + '40' }}>
+                              {stage.name}
+                            </Badge>
+                          )}
+                          <button
+                            onClick={() => deleteDeal(deal)}
+                            className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {deal.priority && (
+                        <Badge className={`text-[10px] px-1.5 py-0 mt-2 ${deal.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : deal.priority === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}>
+                          {deal.priority === 'high' ? 'Высокий' : deal.priority === 'medium' ? 'Средний' : 'Низкий'}
+                        </Badge>
+                      )}
+
+                      {/* Stage navigation */}
+                      {pipelineStages.length > 0 && (
+                        <div className="flex items-center gap-2 mt-3">
+                          <button
+                            onClick={() => moveDeal(deal, stageIndex - 1)}
+                            disabled={stageIndex <= 0}
+                            className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <ChevronLeft className="h-3.5 w-3.5" />
+                          </button>
+                          <div className="flex items-center gap-1 flex-1">
+                            {pipelineStages.map((s, i) => (
+                              <button
+                                key={s.id}
+                                onClick={() => moveDeal(deal, i)}
+                                className={`h-2 rounded-full transition-all duration-200 ${i === stageIndex ? 'flex-1 max-w-[40px]' : 'w-2'} hover:opacity-80`}
+                                style={{ backgroundColor: i === stageIndex ? s.color : s.color + '40' }}
+                                title={s.name}
+                              />
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => moveDeal(deal, stageIndex + 1)}
+                            disabled={stageIndex >= pipelineStages.length - 1}
+                            className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
+
+                      <p className="text-[10px] text-muted-foreground/60 mt-2">
+                        {new Date(deal.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ═══════════════════════════════════════════════════════════════════════
+            TAB 5: Задачи
         ═══════════════════════════════════════════════════════════════════════ */}
         <TabsContent value="tasks" className="mt-4">
           <div className="flex items-center justify-between mb-4">

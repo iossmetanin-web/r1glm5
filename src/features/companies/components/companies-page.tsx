@@ -48,6 +48,7 @@ import {
   AlertTriangle,
   Building2,
   Tag,
+  Layers,
   X,
 } from 'lucide-react'
 
@@ -152,6 +153,7 @@ function pluralizeCompanies(n: number): string {
 // ─── Tag helpers ─────────────────────────────────────────────────────────────
 
 interface TagItem { id: string; name: string; color: string }
+interface SegmentItem { id: string; name: string }
 
 const SETTINGS_TAGS_ID = '00000001-0000-0000-0000-000000000001'
 
@@ -197,6 +199,35 @@ async function removeCompanyTag(companyId: string, tagName: string) {
       .eq('company_id', companyId)
       .eq('type', 'company_tag')
       .eq('content', tagName)
+}
+
+// ─── Segment helpers ──────────────────────────────────────────────────────────
+
+const SETTINGS_SEGMENTS_ID = '00000001-0000-0000-0000-000000000002'
+
+async function loadSegments(): Promise<SegmentItem[]> {
+  try {
+    const { data } = await supabase
+      .from('activities')
+      .select('content')
+      .eq('id', SETTINGS_SEGMENTS_ID)
+      .eq('type', 'settings')
+      .single()
+    if (!data?.content) return []
+    return JSON.parse(data.content)
+  } catch { return [] }
+}
+
+async function getCompanySegments(companyId: string): Promise<string[]> {
+  try {
+    const { data } = await supabase
+      .from('activities')
+      .select('content')
+      .eq('company_id', companyId)
+      .eq('type', 'company_segment')
+    if (!data) return []
+    return data.map((a) => a.content)
+  } catch { return [] }
 }
 
 // ─── Form types ───────────────────────────────────────────────────────────────
@@ -246,10 +277,14 @@ export function CompaniesPage() {
   const [managerFilter, setManagerFilter] = useState<ManagerFilter>('Все')
   const [sourceFilter, setSourceFilter] = useState('')
   const [tagFilter, setTagFilter] = useState('')
+  const [segmentFilter, setSegmentFilter] = useState('')
 
   // Tags state
   const [allTags, setAllTags] = useState<TagItem[]>([])
   const [companyTags, setCompanyTags] = useState<Record<string, string[]>>({})
+  // Segments state
+  const [allSegments, setAllSegments] = useState<SegmentItem[]>([])
+  const [companySegments, setCompanySegments] = useState<Record<string, string[]>>({})
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -307,6 +342,12 @@ export function CompaniesPage() {
         if (!cancelled) setAllTags(tags)
       } catch { /* tags optional */ }
 
+      // Load segments
+      try {
+        const segments = await loadSegments()
+        if (!cancelled) setAllSegments(segments)
+      } catch { /* segments optional */ }
+
       if (cancelled) return
       setCompanies(companiesData)
       setManagers(managersData)
@@ -318,21 +359,28 @@ export function CompaniesPage() {
         try {
           const { data: tagData } = await supabase
             .from('activities')
-            .select('company_id, content')
-            .eq('type', 'company_tag')
+            .select('company_id, content, type')
+            .in('type', ['company_tag', 'company_segment'])
           if (tagData && !cancelled) {
             const tagMap: Record<string, string[]> = {}
+            const segMap: Record<string, string[]> = {}
             for (const c of companiesData) {
               tagMap[c.id] = []
+              segMap[c.id] = []
             }
             for (const t of tagData) {
-              if (t.company_id && tagMap[t.company_id]) {
-                tagMap[t.company_id].push(t.content)
+              if (t.company_id) {
+                if (t.type === 'company_tag' && tagMap[t.company_id]) {
+                  tagMap[t.company_id].push(t.content)
+                } else if (t.type === 'company_segment' && segMap[t.company_id]) {
+                  segMap[t.company_id].push(t.content)
+                }
               }
             }
             setCompanyTags(tagMap)
+            setCompanySegments(segMap)
           }
-        } catch { /* company tags optional */ }
+        } catch { /* company tags/segments optional */ }
       }
     }
     load()
@@ -367,6 +415,14 @@ export function CompaniesPage() {
       result = result.filter((c) => {
         const tags = companyTags[c.id] || []
         return tags.includes(tagFilter)
+      })
+    }
+
+    // Segment filter
+    if (segmentFilter) {
+      result = result.filter((c) => {
+        const segs = companySegments[c.id] || []
+        return segs.includes(segmentFilter)
       })
     }
 
@@ -405,7 +461,7 @@ export function CompaniesPage() {
     })
 
     return result
-  }, [companies, searchQuery, statusFilter, managerFilter, sourceFilter, tagFilter, companyTags, currentUser])
+  }, [companies, searchQuery, statusFilter, managerFilter, sourceFilter, tagFilter, segmentFilter, companyTags, companySegments, currentUser])
 
   // ─── INN Duplicate Check ─────────────────────────────────────────────────
 
@@ -639,7 +695,8 @@ export function CompaniesPage() {
             statusFilter !== 'Все' ||
             sourceFilter ||
             managerFilter !== 'Все' ||
-            tagFilter
+            tagFilter ||
+            segmentFilter
               ? ` · ${filteredCompanies.length} найдено`
               : ''}
           </p>
@@ -745,6 +802,24 @@ export function CompaniesPage() {
                     <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
                     {t.name}
                   </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {/* Segment filter */}
+        {allSegments.length > 0 && (
+          <Select value={segmentFilter} onValueChange={(v) => setSegmentFilter(v === '__none__' ? '' : v)}>
+            <SelectTrigger className="w-auto h-8 rounded-xl text-xs min-w-[150px]">
+              <Layers className="h-3 w-3 mr-1.5 shrink-0" />
+              <SelectValue placeholder="Все сегменты" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Все сегменты</SelectItem>
+              {allSegments.map((s) => (
+                <SelectItem key={s.id} value={s.name}>
+                  {s.name}
                 </SelectItem>
               ))}
             </SelectContent>

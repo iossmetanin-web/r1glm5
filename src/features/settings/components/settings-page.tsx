@@ -29,6 +29,7 @@ import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -98,6 +99,7 @@ const SETTINGS_IDS: Record<string, string> = {
   custom_fields: '00000001-0000-0000-0000-000000000003',
   task_statuses: '00000001-0000-0000-0000-000000000004',
   task_priorities: '00000001-0000-0000-0000-000000000005',
+  reminder: '00000001-0000-0000-0000-000000000006',
 }
 
 async function loadSettings<T>(category: string, fallback: T): Promise<T> {
@@ -617,6 +619,20 @@ function CrmSection() {
   const [saving, setSaving] = useState(false)
 
   const [stagesInitialized, setStagesInitialized] = useState(false)
+  const [stageDealCounts, setStageDealCounts] = useState<Record<string, number>>({})
+  const [dealsInitialized, setDealsInitialized] = useState(false)
+
+  const loadDealCounts = () => {
+    supabase.from('deals').select('stage_id').then(({ data }) => {
+      const counts: Record<string, number> = {}
+      for (const deal of data ?? []) {
+        if (deal.stage_id) {
+          counts[deal.stage_id] = (counts[deal.stage_id] ?? 0) + 1
+        }
+      }
+      setStageDealCounts(counts)
+    })
+  }
 
   if (!stagesInitialized) {
     setStagesInitialized(true)
@@ -630,6 +646,11 @@ function CrmSection() {
         else setStages(data ?? [])
         setLoading(false)
       })
+  }
+
+  if (!dealsInitialized) {
+    setDealsInitialized(true)
+    loadDealCounts()
   }
 
   const openAdd = () => {
@@ -687,6 +708,7 @@ function CrmSection() {
     supabase.from('pipeline_stages').select('*').eq('pipeline_id', PIPELINE_ID).order('position').then(({ data: d }) => {
       if (d) setStages(d)
     })
+    loadDealCounts()
   }
 
   const handleDelete = async (id: string) => {
@@ -694,6 +716,7 @@ function CrmSection() {
     supabase.from('pipeline_stages').select('*').eq('pipeline_id', PIPELINE_ID).order('position').then(({ data: d }) => {
       if (d) setStages(d)
     })
+    loadDealCounts()
   }
 
   return (
@@ -722,7 +745,7 @@ function CrmSection() {
                   <div key={stage.id} className="flex items-center gap-3 py-1.5">
                     <Circle className="h-3 w-3 shrink-0" style={{ color: stage.color, fill: stage.color }} />
                     <span className="text-sm text-foreground flex-1">{stage.name}</span>
-                    <Badge variant="secondary" className="text-xs tabular-nums">0</Badge>
+                    <Badge variant="secondary" className="text-xs tabular-nums">{stageDealCounts[stage.id] ?? 0}</Badge>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-200">
@@ -990,6 +1013,17 @@ function TasksSection() {
 
   // Reminder toggle
   const [reminderOn, setReminderOn] = useState(true)
+  const [reminderInitialized, setReminderInitialized] = useState(false)
+
+  if (!reminderInitialized) {
+    setReminderInitialized(true)
+    loadSettings<boolean>('reminder', true).then((v) => setReminderOn(v))
+  }
+
+  const handleReminderToggle = async (checked: boolean) => {
+    setReminderOn(checked)
+    await saveSettings('reminder', checked)
+  }
 
   const [tasksInitialized, setTasksInitialized] = useState(false)
 
@@ -1230,7 +1264,7 @@ function TasksSection() {
               <p className="text-sm font-medium text-foreground">Напоминания о сроках</p>
               <p className="text-xs text-muted-foreground mt-0.5">Уведомлять за 1 день до дедлайна</p>
             </div>
-            <Switch checked={reminderOn} onCheckedChange={setReminderOn} />
+            <Switch checked={reminderOn} onCheckedChange={handleReminderToggle} />
           </div>
         </CardContent>
       </Card>
